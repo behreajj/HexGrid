@@ -18,7 +18,7 @@ bl_info = {
     "blender": (2, 90, 1),
     "category": "Add Mesh",
     "description": "Creates a hexagon grid.",
-    "tracker_url": "https://github.com/behreajj/"
+    "tracker_url": "https://github.com/behreajj/HexGrid"
 }
 
 
@@ -181,34 +181,6 @@ class HexGridMaker(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         return context.area.type == "VIEW_3D"
-
-    @staticmethod
-    def vertex_comparator(a) -> float:
-        aco = a.co
-        heading = math.atan2(aco[1], aco[0]) % math.tau
-        mag = (aco[0] ** 2 + aco[1] ** 2 + aco[2] ** 2) ** 0.5
-        return heading * mag
-
-    @staticmethod
-    def calc_dimensions(bm=None) -> tuple:
-
-        # Initialize to an arbitrarily large +/- value.
-        lb = [1000000.0, 1000000.0, 1000000.0]
-        ub = [-1000000.0, -1000000.0, -1000000.0]
-
-        verts = bm.verts
-        for vert in verts:
-            co = vert.co
-
-            lb[0] = min(co[0], lb[0])
-            lb[1] = min(co[1], lb[1])
-            lb[2] = min(co[2], lb[2])
-
-            ub[0] = max(co[0], ub[0])
-            ub[1] = max(co[1], ub[1])
-            ub[2] = max(co[2], ub[2])
-
-        return lb, ub
 
     @staticmethod
     def grid_hex(
@@ -453,6 +425,34 @@ class HexGridMaker(bpy.types.Operator):
                                         vec=(0.0, 0.0, verif_ub))
 
         bm.normal_update()
+
+    @staticmethod
+    def calc_dimensions(bm=None) -> tuple:
+
+        # Initialize to an arbitrarily large +/- value.
+        lb = [1000000.0, 1000000.0, 1000000.0]
+        ub = [-1000000.0, -1000000.0, -1000000.0]
+
+        verts = bm.verts
+        for vert in verts:
+            co = vert.co
+
+            lb[0] = min(co[0], lb[0])
+            lb[1] = min(co[1], lb[1])
+            lb[2] = min(co[2], lb[2])
+
+            ub[0] = max(co[0], ub[0])
+            ub[1] = max(co[1], ub[1])
+            ub[2] = max(co[2], ub[2])
+
+        return lb, ub
+
+    @staticmethod
+    def vertex_comparator(a) -> float:
+        aco = a.co
+        heading = math.atan2(aco[1], aco[0]) % math.tau
+        mag = (aco[0] ** 2 + aco[1] ** 2 + aco[2] ** 2) ** 0.5
+        return heading * mag
 
 
 def menu_func(self, context):
