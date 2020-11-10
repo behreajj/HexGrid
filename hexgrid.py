@@ -74,9 +74,20 @@ class HexGridMaker(bpy.types.Operator):
             ("NGON", "NGon", "Fill with a hexagon", 1),
             ("PENTA", "Pentagon Fan",
              "Fill with 3 pentagons sharing a central vertex; creates 3 extra vertices", 2),
-            ("QUAD", "Quad Fan", "Fill with 3 quadrilaterals sharing a central vertex", 3),
-            ("TRI", "Tri Fan", "Fill with 6 triangles sharing a central vertex", 4),
-            ("WIRE", "Wire", "Do not fill; use only edges", 5)],
+            ("QUAD6", "Quad 6 Fan",
+             "Fill with 6 quadrilaterals sharing a central vertex; creates 6 extra vertices", 3),
+            ("QUAD3", "Quad 3 Fan",
+             "Fill with 3 quadrilaterals sharing a central vertex", 4),
+            ("QUAD_CR", "Quad Cross",
+             "Fill with 4 quadrilaterals sharing a central vertex; creates 2 extra vertices", 5),
+            ("TRI", "Tri Fan", "Fill with 6 triangles sharing a central vertex", 6),
+            ("CATALAN_RAY", "Catalan Ray",
+             "Fills with triangles by connecting a corner to non-adjacent vertices", 7),
+            ("CATALAN_TRI", "Catalan Tri",
+             "Fill with a central tri surrounded by 3 peripheral tris", 8),
+            ("CATALAN_Z", "Catalan Z",
+             "Fill with 4 triangles, with edges forming a z pattern", 9),
+            ("WIRE", "Wire", "Do not fill; use only edges", 10)],
         name="Face Type",
         default="NGON",
         description="How to fill each hexagon cell")
@@ -102,8 +113,8 @@ class HexGridMaker(bpy.types.Operator):
     terrain_type: EnumProperty(
         items=[
             ("UNIFORM", "Uniform", "Extrude by a uniform amount", 1),
-            ("NOISE", "Noise", "Extrude with Perlin noise", 2)
-        ],
+            ("NOISE", "Noise", "Extrude with Perlin noise", 2),
+            ("LINEAR", "Linear", "Linear gradient", 3)],
         name="Terrain Type",
         default="UNIFORM",
         description="How to extrude each hexagon cell")
@@ -129,24 +140,46 @@ class HexGridMaker(bpy.types.Operator):
 
     noise_basis: EnumProperty(
         items=[
-            ("BLENDER", "Blender", "", 1),
-            ("PERLIN_ORIGINAL", "Perlin Original", "", 2),
-            ("PERLIN_NEW", "Perlin New", "", 3),
-            ("VORONOI_F1", "Voronoi F1", "", 4),
-            ("VORONOI_F2", "Voronoi F2", "", 5),
-            ("VORONOI_F3", "Voronoi F3", "", 6),
-            ("VORONOI_F4", "Voronoi F4", "", 7),
-            ("VORONOI_F2F1", "Voronoi F2 F1", "", 8),
-            ("VORONOI_CRACKLE", "Voronoi Crackle", "", 9),
-            ("CELLNOISE", "Cell Noise", "", 10)],
+            ("BLENDER", "Blender", "Blender", 1),
+            ("PERLIN_ORIGINAL", "Perlin Original", "Perlin Original", 2),
+            ("PERLIN_NEW", "Perlin New", "Perlin New", 3),
+            ("VORONOI_F1", "Voronoi F1", "Voronoi F1", 4),
+            ("VORONOI_F2", "Voronoi F2", "Voronoi F2", 5),
+            ("VORONOI_F3", "Voronoi F3", "Voronoi F3", 6),
+            ("VORONOI_F4", "Voronoi F4", "Voronoi F4", 7),
+            ("VORONOI_F2F1", "Voronoi F2 F1", "Voronoi F2 F1", 8),
+            ("VORONOI_CRACKLE", "Voronoi Crackle", "Voronoi Crackle", 9),
+            ("CELLNOISE", "Cell Noise", "Cell Noise", 10)],
         name="Noise Basis",
         default="BLENDER",
         description="Underlying noise algorithm to use")
 
+    origin: FloatVectorProperty(
+        name="Origin",
+        description="Linear gradient origin",
+        default=(-1.0, -1.0),
+        soft_min=-1.0,
+        soft_max=1.0,
+        step=1,
+        precision=3,
+        size=2,
+        subtype="TRANSLATION")
+
+    destination: FloatVectorProperty(
+        name="Destination",
+        description="Linear gradient destination",
+        default=(1.0, 1.0),
+        soft_min=-1.0,
+        soft_max=1.0,
+        step=1,
+        precision=3,
+        size=2,
+        subtype="TRANSLATION")
+
     def execute(self, context):
         bm = bmesh.new()
 
-        hex_faces = HexGridMaker.grid_hex(
+        result = HexGridMaker.grid_hex(
             bm=bm,
             rings=self.rings,
             cell_radius=self.cell_radius,
@@ -158,13 +191,15 @@ class HexGridMaker(bpy.types.Operator):
         if self.face_type != "WIRE":
             HexGridMaker.extrude_hexagons(
                 bm=bm,
-                faces=hex_faces,
+                faces=result["faces"],
                 extrude_lb=self.extrude_lb,
                 extrude_ub=self.extrude_ub,
                 terrain_type=self.terrain_type,
                 noise_offset=self.noise_offset,
                 noise_scale=self.noise_scale,
                 noise_basis=self.noise_basis,
+                origin=self.origin,
+                dest=self.destination,
                 merge_verts=self.merge_verts)
 
         mesh_data = bpy.data.meshes.new("Hex.Grid")
@@ -190,7 +225,7 @@ class HexGridMaker(bpy.types.Operator):
             cell_margin=0.0,
             face_type="NGON",
             orientation=0.0,
-            merge_verts=False) -> list:
+            merge_verts=False) -> dict:
 
         # Validate input arguments.
         verif_rings = 1 if rings < 1 else rings
@@ -246,7 +281,7 @@ class HexGridMaker(bpy.types.Operator):
                 hex_faces = []
 
                 # Insert hexagon center for tri- and quad-fan face pattern.
-                if face_type == 'TRI':
+                if face_type == "TRI":
                     hex_vs.insert(0, bm.verts.new((x, y, 0.0)))
 
                     # Six triangles.
@@ -263,7 +298,7 @@ class HexGridMaker(bpy.types.Operator):
                     hex_faces.append(bm.faces.new(
                         [hex_vs[0], hex_vs[6], hex_vs[1]]))
 
-                elif face_type == 'QUAD':
+                elif face_type == "QUAD3":
                     hex_vs.insert(0, bm.verts.new((x, y, 0.0)))
 
                     # Three quadrilaterals.
@@ -274,8 +309,59 @@ class HexGridMaker(bpy.types.Operator):
                     hex_faces.append(bm.faces.new(
                         [hex_vs[0], hex_vs[5], hex_vs[6], hex_vs[1]]))
 
-                elif face_type == 'PENTA':
+                elif face_type == "QUAD_CR":
+                    # Calculate midpoints.
+                    mp0 = 0.5 * (hex_vs[1].co + hex_vs[2].co)
+                    mp1 = 0.5 * (hex_vs[4].co + hex_vs[5].co)
 
+                    # Insert center and midpoints.
+                    hex_vs.insert(0, bm.verts.new((x, y, 0.0)))
+                    hex_vs.insert(3, bm.verts.new((mp0[0], mp0[1], 0.0)))
+                    hex_vs.insert(7, bm.verts.new((mp1[0], mp1[1], 0.0)))
+
+                    # Four quadrilaterals.
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[1], hex_vs[2], hex_vs[3]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[3], hex_vs[4], hex_vs[5]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[5], hex_vs[6], hex_vs[7]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[7], hex_vs[8], hex_vs[1]]))
+
+                elif face_type == "QUAD6":
+                    # Calculate midpoints.
+                    mp0 = 0.5 * (hex_vs[0].co + hex_vs[1].co)
+                    mp1 = 0.5 * (hex_vs[1].co + hex_vs[2].co)
+                    mp2 = 0.5 * (hex_vs[2].co + hex_vs[3].co)
+                    mp3 = 0.5 * (hex_vs[3].co + hex_vs[4].co)
+                    mp4 = 0.5 * (hex_vs[4].co + hex_vs[5].co)
+                    mp5 = 0.5 * (hex_vs[5].co + hex_vs[0].co)
+
+                    # Insert center and midpoints.
+                    hex_vs.insert(0, bm.verts.new((x, y, 0.0)))
+                    hex_vs.insert(2, bm.verts.new((mp0[0], mp0[1], 0.0)))
+                    hex_vs.insert(4, bm.verts.new((mp1[0], mp1[1], 0.0)))
+                    hex_vs.insert(6, bm.verts.new((mp2[0], mp2[1], 0.0)))
+                    hex_vs.insert(8, bm.verts.new((mp3[0], mp3[1], 0.0)))
+                    hex_vs.insert(10, bm.verts.new((mp4[0], mp4[1], 0.0)))
+                    hex_vs.insert(12, bm.verts.new((mp5[0], mp5[1], 0.0)))
+
+                    # Six quadrilaterals.
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[12], hex_vs[1], hex_vs[2]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[2], hex_vs[3], hex_vs[4]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[4], hex_vs[5], hex_vs[6]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[6], hex_vs[7], hex_vs[8]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[8], hex_vs[9], hex_vs[10]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[10], hex_vs[11], hex_vs[12]]))
+
+                elif face_type == "PENTA":
                     # Calculate midpoints.
                     mp0 = 0.5 * (hex_vs[0].co + hex_vs[1].co)
                     mp1 = 0.5 * (hex_vs[2].co + hex_vs[3].co)
@@ -287,6 +373,8 @@ class HexGridMaker(bpy.types.Operator):
                     hex_vs.insert(5, bm.verts.new((mp1[0], mp1[1], 0.0)))
                     hex_vs.insert(8, bm.verts.new((mp2[0], mp2[1], 0.0)))
 
+                    # TODO Rearrange so there is a face at the top ?
+
                     # Three pentagons.
                     hex_faces.append(bm.faces.new(
                         [hex_vs[0], hex_vs[2], hex_vs[3], hex_vs[4], hex_vs[5]]))
@@ -295,7 +383,40 @@ class HexGridMaker(bpy.types.Operator):
                     hex_faces.append(bm.faces.new(
                         [hex_vs[0], hex_vs[8], hex_vs[9], hex_vs[1], hex_vs[2]]))
 
-                elif face_type == 'WIRE':
+                elif face_type == "CATALAN_RAY":
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[1], hex_vs[2]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[2], hex_vs[3]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[3], hex_vs[4]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[4], hex_vs[5]]))
+
+                elif face_type == "CATALAN_TRI":
+                    # Central triangle.
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[1], hex_vs[3], hex_vs[5]]))
+
+                    # Peripheral triangles.
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[1], hex_vs[5]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[1], hex_vs[2], hex_vs[3]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[3], hex_vs[4], hex_vs[5]]))
+
+                elif face_type == "CATALAN_Z":
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[1], hex_vs[5]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[1], hex_vs[2], hex_vs[5]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[2], hex_vs[4], hex_vs[5]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[2], hex_vs[3], hex_vs[4]]))
+
+                elif face_type == "WIRE":
                     bm.edges.new([hex_vs[0], hex_vs[1]])
                     bm.edges.new([hex_vs[1], hex_vs[2]])
                     bm.edges.new([hex_vs[2], hex_vs[3]])
@@ -313,6 +434,13 @@ class HexGridMaker(bpy.types.Operator):
         # Remove duplicate vertices on hexagon edges.
         if verif_merge:
             bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.000001)
+
+        # Transform BMesh.
+        # Do this before assigning UVs so that they are orthonormal
+        # regardless of world coordinates.
+        rot_mat = mathutils.Matrix.Rotation(
+            orientation, 4, (0.0, 0.0, 1.0))
+        bmesh.ops.rotate(bm, matrix=rot_mat, verts=bm.verts)
 
         # Ensure vertices have indices.
         bm.verts.sort(key=HexGridMaker.vertex_comparator)
@@ -341,15 +469,13 @@ class HexGridMaker(bpy.types.Operator):
             for loop in face.loops:
                 loop[uv_layer].uv = vts[loop.vert.index]
 
-        # Transform BMesh.
-        rot_mat = mathutils.Matrix.Rotation(
-            orientation, 4, (0.0, 0.0, 1.0))
-        bmesh.ops.rotate(bm, matrix=rot_mat, verts=bm.verts)
-
         # Update normals, jic.
         bm.normal_update()
 
-        return faces
+        return {
+            "faces": faces,
+            "width": width,
+            "height": height}
 
     @staticmethod
     def extrude_hexagons(
@@ -361,6 +487,8 @@ class HexGridMaker(bpy.types.Operator):
             noise_offset=(0.0, 0.0, 0.0),
             noise_scale=1.0,
             noise_basis="BLENDER",
+            origin=(-1.0, -1.0),
+            dest=(1.0, 1.0),
             merge_verts=False):
 
         # Validate input arguments.
@@ -385,7 +513,15 @@ class HexGridMaker(bpy.types.Operator):
             bmesh.ops.translate(bm, verts=new_verts,
                                 vec=(0.0, 0.0, verif_ub))
         else:
+
+            # For linear gradient.
+            b = (dest[0] - origin[0],
+                 dest[1] - origin[1])
+            dot_bb = b[0] ** 2 + b[1] ** 2
+            inv_dot_bb = 0.0 if dot_bb == 0.0 else 1.0 / dot_bb
+
             for hex_faces in faces:
+
                 # Extrude does not translate.
                 result = bmesh.ops.extrude_face_region(
                     bm,
@@ -399,7 +535,6 @@ class HexGridMaker(bpy.types.Operator):
                     if isinstance(elm, bmesh.types.BMVert):
                         new_verts.append(elm)
 
-                # TODO: Consider linear and spherical falloff, cosine wave
                 if terrain_type == "NOISE":
 
                     # Find the center point of all the faces.
@@ -419,7 +554,30 @@ class HexGridMaker(bpy.types.Operator):
                     z = (1.0 - fac) * verif_lb + fac * verif_ub
                     bmesh.ops.translate(bm, verts=new_verts, vec=(0.0, 0.0, z))
 
+                elif terrain_type == "LINEAR":
+
+                    # Variant of above, doesn't use mathutils.Vector .
+                    point = [0.0, 0.0, 0.0]
+                    for hex_face in hex_faces:
+                        center = hex_face.calc_center_median()
+                        point[0] += center[0]
+                        point[1] += center[1]
+
+                    hex_count = len(hex_faces)
+                    inv_hex_count = 0.0 if hex_count == 0.0 else 1.0 / hex_count
+                    point[0] *= inv_hex_count
+                    point[1] *= inv_hex_count
+
+                    a = (point[0] - origin[0],
+                         point[1] - origin[1])
+
+                    dot_ab = a[0] * b[0] + a[1] * b[1]
+                    fac = max(0.0, min(1.0, dot_ab * inv_dot_bb))
+                    z = (1.0 - fac) * verif_lb + fac * verif_ub
+                    bmesh.ops.translate(bm, verts=new_verts, vec=(0.0, 0.0, z))
+
                 else:
+
                     # "UNIFORM" is the default case.
                     bmesh.ops.translate(bm, verts=new_verts,
                                         vec=(0.0, 0.0, verif_ub))
