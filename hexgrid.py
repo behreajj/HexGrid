@@ -72,25 +72,37 @@ class HexGridMaker(bpy.types.Operator):
     face_type: EnumProperty(
         items=[
             ("NGON", "NGon", "Fill with a hexagon", 1),
-            ("PENTA", "Pentagon Fan",
+            ("PENTA3", "Pentagon Fan",
              "Fill with 3 pentagons sharing a central vertex; creates 3 extra vertices", 2),
             ("QUAD6", "Quad 6 Fan",
              "Fill with 6 quadrilaterals sharing a central vertex; creates 6 extra vertices", 3),
             ("QUAD3", "Quad 3 Fan",
              "Fill with 3 quadrilaterals sharing a central vertex", 4),
+            ("TRI", "Tri Fan", "Fill with 6 triangles sharing a central vertex", 5),
             ("QUAD_CR", "Quad Cross",
-             "Fill with 4 quadrilaterals sharing a central vertex; creates 2 extra vertices", 5),
-            ("TRI", "Tri Fan", "Fill with 6 triangles sharing a central vertex", 6),
+             "Fill with 4 quadrilaterals sharing a central vertex; creates 2 extra vertices", 6),
+            ("QUAD2", "Quad Split", "Split with 2 quadrilaterlas on a central axis", 7),
+            ("PENTA2", "Penta Split", "Split with 2 pentagons on a central axis", 8),
             ("CATALAN_RAY", "Catalan Ray",
-             "Fills with triangles by connecting a corner to non-adjacent vertices", 7),
+             "Fills with triangles by connecting a corner to non-adjacent vertices", 9),
             ("CATALAN_TRI", "Catalan Tri",
-             "Fill with a central tri surrounded by 3 peripheral tris", 8),
+             "Fill with a central tri surrounded by 3 peripheral tris", 10),
             ("CATALAN_Z", "Catalan Z",
-             "Fill with 4 triangles, with edges forming a z pattern", 9),
-            ("WIRE", "Wire", "Do not fill; use only edges", 10)],
+             "Fill with 4 triangles, with edges forming a z pattern", 11),
+            ("WIRE", "Wire", "Do not fill; use only edges", 12)],
         name="Face Type",
         default="NGON",
         description="How to fill each hexagon cell")
+
+    terrain_type: EnumProperty(
+        items=[
+            ("UNIFORM", "Uniform", "Extrude by a uniform amount", 1),
+            ("NOISE", "Noise", "Extrude with Perlin noise", 2),
+            ("LINEAR", "Linear", "Linear gradient", 3),
+            ("SPHERICAL", "Spherical", "Spherical gradient", 4)],
+        name="Terrain Type",
+        default="UNIFORM",
+        description="How to extrude each hexagon cell")
 
     extrude_lb: FloatProperty(
         name="Extrude Lower",
@@ -110,21 +122,10 @@ class HexGridMaker(bpy.types.Operator):
         precision=3,
         default=0.0)
 
-    terrain_type: EnumProperty(
-        items=[
-            ("UNIFORM", "Uniform", "Extrude by a uniform amount", 1),
-            ("NOISE", "Noise", "Extrude with Perlin noise", 2),
-            ("LINEAR", "Linear", "Linear gradient", 3)],
-        name="Terrain Type",
-        default="UNIFORM",
-        description="How to extrude each hexagon cell")
-
     noise_offset: FloatVectorProperty(
         name="Noise Offset",
         description="Offset added to noise input",
         default=(0.0, 0.0, 0.0),
-        soft_min=-1.0,
-        soft_max=1.0,
         step=1,
         precision=3,
         subtype="TRANSLATION")
@@ -218,6 +219,35 @@ class HexGridMaker(bpy.types.Operator):
         return context.area.type == "VIEW_3D"
 
     @staticmethod
+    def faces_per_hexagon(face_type="NGON") -> int:
+        if face_type == "TRI":
+            return 6
+        elif face_type == "QUAD2":
+            return 2
+        elif face_type == "QUAD3":
+            return 3
+        elif face_type == "QUAD_CR":
+            return 4
+        elif face_type == "QUAD6":
+            return 6
+        elif face_type == "NGON":
+            return 1
+        elif face_type == "PENTA2":
+            return 2
+        elif face_type == "PENTA3":
+            return 3
+        elif face_type == "CATALAN_RAY":
+            return 4
+        elif face_type == "CATALAN_TRI":
+            return 4
+        elif face_type == "CATALAN_Z":
+            return 4
+        elif face_type == "WIRE":
+            return 0
+        else:
+            return 0
+
+    @staticmethod
     def grid_hex(
             bm=None,
             rings=1,
@@ -234,7 +264,7 @@ class HexGridMaker(bpy.types.Operator):
 
         # Pentagonal faces subdivide edges that share a boundary with edges that
         # remain undivided, leading to issues.
-        verif_merge = merge_verts and verif_margin == 0.0 and face_type != "PENTA"
+        verif_merge = merge_verts and verif_margin == 0.0 and face_type != "PENTA3"
 
         # Intermediate calculations.
         sqrt_3 = 3.0 ** 0.5  # 1.7320508075688772
@@ -297,6 +327,14 @@ class HexGridMaker(bpy.types.Operator):
                         [hex_vs[0], hex_vs[5], hex_vs[6]]))
                     hex_faces.append(bm.faces.new(
                         [hex_vs[0], hex_vs[6], hex_vs[1]]))
+
+                elif face_type == "QUAD2":
+
+                    # Two quadrilaterals.
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[1], hex_vs[2], hex_vs[3]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[3], hex_vs[4], hex_vs[5], hex_vs[0]]))
 
                 elif face_type == "QUAD3":
                     hex_vs.insert(0, bm.verts.new((x, y, 0.0)))
@@ -361,7 +399,22 @@ class HexGridMaker(bpy.types.Operator):
                     hex_faces.append(bm.faces.new(
                         [hex_vs[0], hex_vs[10], hex_vs[11], hex_vs[12]]))
 
-                elif face_type == "PENTA":
+                elif face_type == "PENTA2":
+                    # Calculate midpoints.
+                    mp0 = 0.5 * (hex_vs[1].co + hex_vs[2].co)
+                    mp1 = 0.5 * (hex_vs[4].co + hex_vs[5].co)
+
+                    # Insert midpoints.
+                    hex_vs.insert(2, bm.verts.new((mp0[0], mp0[1], 0.0)))
+                    hex_vs.insert(6, bm.verts.new((mp1[0], mp1[1], 0.0)))
+
+                    # Two pentagons.
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[0], hex_vs[1], hex_vs[2], hex_vs[6], hex_vs[7]]))
+                    hex_faces.append(bm.faces.new(
+                        [hex_vs[2], hex_vs[3], hex_vs[4], hex_vs[5], hex_vs[6]]))
+
+                elif face_type == "PENTA3":
                     # Calculate midpoints.
                     mp0 = 0.5 * (hex_vs[0].co + hex_vs[1].co)
                     mp1 = 0.5 * (hex_vs[2].co + hex_vs[3].co)
@@ -552,6 +605,27 @@ class HexGridMaker(bpy.types.Operator):
                     fac *= 0.5
                     fac += 0.5
                     z = (1.0 - fac) * verif_lb + fac * verif_ub
+                    bmesh.ops.translate(bm, verts=new_verts, vec=(0.0, 0.0, z))
+
+                elif terrain_type == "SPHERICAL":
+
+                    # Variant of above, doesn't use mathutils.Vector .
+                    point = [0.0, 0.0, 0.0]
+                    for hex_face in hex_faces:
+                        center = hex_face.calc_center_median()
+                        point[0] += center[0]
+                        point[1] += center[1]
+
+                    hex_count = len(hex_faces)
+                    inv_hex_count = 0.0 if hex_count == 0.0 else 1.0 / hex_count
+                    point[0] *= inv_hex_count
+                    point[1] *= inv_hex_count
+
+                    a = (point[0] - origin[0],
+                         point[1] - origin[1])
+                    dot_aa = a[0] ** 2 + a[1] ** 2
+                    fac = max(0.0, min(1.0, dot_aa * inv_dot_bb))
+                    z = (1.0 - fac) * verif_ub + fac * verif_lb
                     bmesh.ops.translate(bm, verts=new_verts, vec=(0.0, 0.0, z))
 
                 elif terrain_type == "LINEAR":
