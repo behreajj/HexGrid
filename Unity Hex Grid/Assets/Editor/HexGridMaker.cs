@@ -26,7 +26,6 @@ public class HexGridMaker : EditorWindow
     string folderPath = "Assets/Meshes/";
     string meshName = "Hex.Grid";
     bool createInstance = true;
-
     int rings = 4;
     float cellRadius = 0.5f;
     float cellMargin = 0.0325f;
@@ -34,7 +33,6 @@ public class HexGridMaker : EditorWindow
     FaceType faceType = FaceType.TriFan;
     float extrudeLb = 0.0f;
     float extrudeUb = 0.0f;
-
     TerrainType terrainType = TerrainType.Flat;
     Vector3 noiseOffset = new Vector3 (0.0f, 0.0f, 0.0f);
     float noiseScale = 1.0f;
@@ -50,23 +48,42 @@ public class HexGridMaker : EditorWindow
     GUIContent instLabel = new GUIContent (
         "Instantiate",
         "Instantiate a game object upon creation.");
-
-    GUIContent ringsLabel = new GUIContent ("Rings", "Number of rings in grid.");
-    GUIContent cellRadLabel = new GUIContent ("Cell Radius", "Radius of each hexagon cell.");
-    GUIContent cellMarginLabel = new GUIContent ("Cell Margin", "Margin between each hexagon cell.");
-    GUIContent orientationLabel = new GUIContent ("Rotation", "Rotation of hexagonal grid.");
-    GUIContent faceTypeLabel = new GUIContent ("Face Type", "How to fill each hexagon cell.");
-
-    GUIContent terrainTypeLabel = new GUIContent ("Terrain Type", "How to extrude each hexagon cell.");
-
-    GUIContent extrudeLbLabel = new GUIContent ("Extrude Lower", "Extrusion lower bound on the y axis.");
-    GUIContent extrudeUbLabel = new GUIContent ("Extrude Upper", "Extrusion upper bound on the y axis.");
-
-    GUIContent noiseOffsetLabel = new GUIContent ("Noise Offset", "Offset added to noise input.");
-    GUIContent noiseScaleLabel = new GUIContent ("Noise Scale", "Scalar multiplied with noise input.");
-
-    GUIContent originLabel = new GUIContent ("Origin", "Linear gradient origin.");
-    GUIContent destLabel = new GUIContent ("Destination", "Linear gradient destination.");
+    GUIContent ringsLabel = new GUIContent (
+        "Rings",
+        "Number of rings in grid.");
+    GUIContent cellRadLabel = new GUIContent (
+        "Cell Radius",
+        "Radius of each hexagon cell.");
+    GUIContent cellMarginLabel = new GUIContent (
+        "Cell Margin",
+        "Margin between each hexagon cell.");
+    GUIContent orientationLabel = new GUIContent (
+        "Rotation",
+        "Rotation of hexagonal grid.");
+    GUIContent faceTypeLabel = new GUIContent (
+        "Face Type",
+        "How to fill each hexagon cell.");
+    GUIContent terrainTypeLabel = new GUIContent (
+        "Terrain Type",
+        "How to extrude each hexagon cell.");
+    GUIContent extrudeLbLabel = new GUIContent (
+        "Extrude Lower",
+        "Extrusion lower bound on the y axis.");
+    GUIContent extrudeUbLabel = new GUIContent (
+        "Extrude Upper",
+        "Extrusion upper bound on the y axis.");
+    GUIContent noiseOffsetLabel = new GUIContent (
+        "Noise Offset",
+        "Offset added to noise input.");
+    GUIContent noiseScaleLabel = new GUIContent (
+        "Noise Scale",
+        "Scalar multiplied with noise input.");
+    GUIContent originLabel = new GUIContent (
+        "Origin",
+        "Linear gradient origin.");
+    GUIContent destLabel = new GUIContent (
+        "Destination",
+        "Linear gradient destination.");
 
     [MenuItem ("Window/Hex Grid")]
     static void Init ( )
@@ -88,7 +105,7 @@ public class HexGridMaker : EditorWindow
 
         rings = Mathf.Max (1, EditorGUILayout.IntField (ringsLabel, rings));
         cellRadius = Mathf.Max (0.0002f, EditorGUILayout.FloatField (cellRadLabel, cellRadius));
-        cellMargin = Mathf.Clamp (EditorGUILayout.FloatField (cellMarginLabel, cellMargin), 0.0f, cellRadius - 0.0001f);
+        cellMargin = Mathf.Clamp (EditorGUILayout.FloatField (cellMarginLabel, cellMargin), 0.0001f, cellRadius - 0.0001f);
         orientation = Mathf.Clamp (EditorGUILayout.FloatField (orientationLabel, orientation), -Mathf.PI, Mathf.PI);
         faceType = (FaceType) EditorGUILayout.EnumPopup (faceTypeLabel, faceType);
 
@@ -147,11 +164,11 @@ public class HexGridMaker : EditorWindow
 
     Mesh HexGridData ( )
     {
-        float altitude = HexGridMaker.Sqrt3 * cellRadius;
+        float extents = HexGridMaker.Sqrt3 * cellRadius;
         float rad15 = cellRadius * 1.5f;
         float padRad = cellRadius - cellMargin;
 
-        float halfAlt = altitude * 0.5f;
+        float halfExt = extents * 0.5f;
         float halfRad = padRad * 0.5f;
         float radRt32 = halfRad * HexGridMaker.Sqrt3;
 
@@ -176,14 +193,14 @@ public class HexGridMaker : EditorWindow
         {
             int jMin = Mathf.Max (iMin, iMin - i);
             int jMax = Mathf.Min (iMax, iMax - i);
-            float iAlt = i * altitude;
+            float iExt = i * extents;
 
             for (int j = jMin; j <= jMax; ++j)
             {
                 float jf = j;
 
                 // Hexagon center.
-                float x = iAlt + jf * halfAlt;
+                float x = iExt + jf * halfExt;
                 float z = jf * rad15;
 
                 // Hexagon edges.
@@ -352,6 +369,61 @@ public class HexGridMaker : EditorWindow
         mesh.triangles = fs;
         mesh.RecalculateTangents ( );
         mesh.Optimize ( );
+
+        return mesh;
+    }
+
+    static Mesh ExtrudeHexes (in Mesh mesh, in FaceType faceType, in TerrainType terrainType)
+    {
+        // Work in progress.
+
+        //    0
+        //  /   \
+        // 1     5
+        // |     |
+        // 2     4
+        //  \   /
+        //    3
+
+        // SIDE NORMALS:
+        // 0 - 1: new Vector3(-0.5f, 0.8660254f, 0.0f)
+        // 1 - 2: new Vector3(-1.0f, 0.0f, 0.0f)
+        // 2 - 3: new Vector3(-0.5f, -0.8660254f, 0.0f)
+        // 3 - 4: new Vector3(0.5f, -0.8660254f, 0.0f)
+        // 4 - 5: new Vector3(1.0f, 0.0f, 0.0f)
+        // 5 - 0: new Vector3(0.5f, 0.8660254f, 0.0f)
+
+        // For flat shading, verts must be duplicated.
+        // 6 new quads = 12 new tris
+        // 12 new tris * 3 verts per tri = 36 indices
+        // 4 coords per 6 sides = 24 new coords
+
+        int vertsPerHex = VertsPerHexagon (faceType);
+        int facesPerHex = FacesPerHexagon (faceType);
+
+        Vector3[ ] vsOld = mesh.vertices;
+        int[ ] fsOld = mesh.triangles;
+
+        int fsOldLength = fsOld.Length;
+        int vsOldLength = vsOld.Length;
+        int hexCount = fsOldLength / facesPerHex;
+
+        // Offsets shouldn't be used if you want to group
+        // together the top bottom and side panels of each hex.
+
+        // int vsPanelOffset = vsOldLength;
+        // int vsRectoOffset = vsPanelOffset + 24 * hexCount;
+        // int vsNewLength = vsRectoOffset + vsOldLength;
+
+        // int fsPanelOffset = fsOldLength;
+        // int fsRectoOffset = fsPanelOffset + 36 * hexCount;
+        // int fsNewLength = fsRectoOffset + fsOldLength;
+
+        int vsNewLength = vsOldLength * 2 + 24 * hexCount;
+        int fsNewLength = fsOldLength * 2 + 36 * hexCount;
+
+        int[ ] fsNew = new int[fsNewLength];
+        Vector3[ ] vsNew = new Vector3[vsNewLength];
 
         return mesh;
     }

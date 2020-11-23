@@ -57,7 +57,7 @@ class HexGridMaker(bpy.types.Operator):
 
     orientation: FloatProperty(
         name="Rotation",
-        description="Rotation of hexagonal grid",
+        description="Rotation of grid as a whole",
         soft_min=-math.pi,
         soft_max=math.pi,
         default=0.0,
@@ -66,7 +66,7 @@ class HexGridMaker(bpy.types.Operator):
 
     merge_verts: BoolProperty(
         name="Merge Vertices",
-        description="Merge overlapping hexagon cell vertices (when margin is 0.0)",
+        description="Merge overlapping hexagon cell vertices when margin is 0.0",
         default=False)
 
     face_type: EnumProperty(
@@ -89,20 +89,11 @@ class HexGridMaker(bpy.types.Operator):
              "Fill with a central tri surrounded by 3 peripheral tris", 10),
             ("CATALAN_Z", "Catalan Z",
              "Fill with 4 triangles, with edges forming a z pattern", 11),
-            ("WIRE", "Wire", "Do not fill; use only edges", 12)],
+            ("WIRE", "Wire", "Do not fill; use only edges", 12),
+            ("POINTS", "Points", "Create only center points", 13)],
         name="Face Type",
         default="NGON",
         description="How to fill each hexagon cell")
-
-    terrain_type: EnumProperty(
-        items=[
-            ("UNIFORM", "Uniform", "Extrude by a uniform amount", 1),
-            ("NOISE", "Noise", "Extrude with Perlin noise", 2),
-            ("LINEAR", "Linear", "Linear gradient", 3),
-            ("SPHERICAL", "Spherical", "Spherical gradient", 4)],
-        name="Terrain Type",
-        default="UNIFORM",
-        description="How to extrude each hexagon cell")
 
     extrude_lb: FloatProperty(
         name="Extrude Lower",
@@ -122,38 +113,14 @@ class HexGridMaker(bpy.types.Operator):
         precision=3,
         default=0.0)
 
-    noise_offset: FloatVectorProperty(
-        name="Noise Offset",
-        description="Offset added to noise input",
-        default=(0.0, 0.0, 0.0),
-        step=1,
-        precision=3,
-        subtype="TRANSLATION")
-
-    noise_scale: FloatProperty(
-        name="Noise Scale",
-        description="Scalar multiplied with noise input",
-        soft_min=0.0,
-        soft_max=10.0,
-        step=1,
-        precision=3,
-        default=1.0)
-
-    noise_basis: EnumProperty(
+    terrain_type: EnumProperty(
         items=[
-            ("BLENDER", "Blender", "Blender", 1),
-            ("PERLIN_ORIGINAL", "Perlin Original", "Perlin Original", 2),
-            ("PERLIN_NEW", "Perlin New", "Perlin New", 3),
-            ("VORONOI_F1", "Voronoi F1", "Voronoi F1", 4),
-            ("VORONOI_F2", "Voronoi F2", "Voronoi F2", 5),
-            ("VORONOI_F3", "Voronoi F3", "Voronoi F3", 6),
-            ("VORONOI_F4", "Voronoi F4", "Voronoi F4", 7),
-            ("VORONOI_F2F1", "Voronoi F2 F1", "Voronoi F2 F1", 8),
-            ("VORONOI_CRACKLE", "Voronoi Crackle", "Voronoi Crackle", 9),
-            ("CELLNOISE", "Cell Noise", "Cell Noise", 10)],
-        name="Noise Basis",
-        default="BLENDER",
-        description="Underlying noise algorithm to use")
+            ("UNIFORM", "Uniform", "Extrude by a uniform amount", 1),
+            ("LINEAR", "Linear", "Linear gradient", 2),
+            ("SPHERICAL", "Spherical", "Spherical gradient", 3)],
+        name="Terrain Type",
+        default="UNIFORM",
+        description="How to extrude each hexagon cell")
 
     origin: FloatVectorProperty(
         name="Origin",
@@ -177,6 +144,49 @@ class HexGridMaker(bpy.types.Operator):
         size=2,
         subtype="TRANSLATION")
 
+    noise_influence: FloatProperty(
+        name="Noise Influence",
+        description="Amount that noise contributes to the extrusion",
+        default=0.0,
+        step=1,
+        precision=3,
+        min=0.0,
+        max=1.0,
+        subtype="FACTOR")
+
+    noise_scale: FloatProperty(
+        name="Noise Scale",
+        description="Scalar multiplied with noise input; values less than 1.0 yield a smoother result",
+        soft_min=0.0,
+        soft_max=10.0,
+        step=1,
+        precision=3,
+        default=1.0)
+
+    noise_offset: FloatVectorProperty(
+        name="Noise Offset",
+        description="Offset added to noise input",
+        default=(0.0, 0.0, 0.0),
+        step=1,
+        precision=3,
+        subtype="TRANSLATION")
+
+    noise_basis: EnumProperty(
+        items=[
+            ("BLENDER", "Blender", "Blender", 1),
+            ("PERLIN_ORIGINAL", "Perlin Original", "Perlin Original", 2),
+            ("PERLIN_NEW", "Perlin New", "Perlin New", 3),
+            ("VORONOI_F1", "Voronoi F1", "Voronoi F1", 4),
+            ("VORONOI_F2", "Voronoi F2", "Voronoi F2", 5),
+            ("VORONOI_F3", "Voronoi F3", "Voronoi F3", 6),
+            ("VORONOI_F4", "Voronoi F4", "Voronoi F4", 7),
+            ("VORONOI_F2F1", "Voronoi F2 F1", "Voronoi F2 F1", 8),
+            ("VORONOI_CRACKLE", "Voronoi Crackle", "Voronoi Crackle", 9),
+            ("CELLNOISE", "Cell Noise", "Cell Noise", 10)],
+        name="Noise Basis",
+        default="BLENDER",
+        description="Underlying noise algorithm to use")
+
     def execute(self, context):
         bm = bmesh.new()
 
@@ -189,34 +199,82 @@ class HexGridMaker(bpy.types.Operator):
             orientation=self.orientation,
             merge_verts=self.merge_verts)
 
-        if self.face_type != "WIRE":
-            HexGridMaker.extrude_hexagons(
+        extruded = False
+        if self.face_type not in ["WIRE", "POINTS"]:
+            extruded = HexGridMaker.extrude_hexagons(
                 bm=bm,
                 faces=result["faces"],
                 extrude_lb=self.extrude_lb,
                 extrude_ub=self.extrude_ub,
                 terrain_type=self.terrain_type,
-                noise_offset=self.noise_offset,
+                noise_influence=self.noise_influence,
                 noise_scale=self.noise_scale,
+                noise_offset=self.noise_offset,
                 noise_basis=self.noise_basis,
                 origin=self.origin,
                 dest=self.destination,
                 merge_verts=self.merge_verts)
 
         mesh_data = bpy.data.meshes.new("Hex.Grid")
-        # TODO: Consider vertex groups... All, Centers, Edges
-
         bm.to_mesh(mesh_data)
         bm.free()
+
         mesh_obj = bpy.data.objects.new(mesh_data.name, mesh_data)
         mesh_obj.rotation_mode = "QUATERNION"
         context.scene.collection.objects.link(mesh_obj)
+
+        #TODO: Make this optional... Turn on/off one vertex group
+        # with all or separate vert groups?
+        fph = HexGridMaker.faces_per_hexagon(
+            face_type=self.face_type)
+        if extruded:
+            fph *= 2
+            fph += HexGridMaker.edges_per_hexagon(
+                face_type=self.face_type)
+        hex_count = result["hex_count"]
+
+        vert_group = mesh_obj.vertex_groups.new(name="All")
+        mesh_polys = mesh_data.polygons
+        to_fac = 1.0 / (hex_count - 1.0)
+
+        for mesh_poly in mesh_polys:
+            poly_index = mesh_poly.index
+            poly_vert_idcs = mesh_poly.vertices
+            fac = (poly_index // fph) * to_fac
+            vert_group.add(poly_vert_idcs, fac, "REPLACE")
 
         return {"FINISHED"}
 
     @classmethod
     def poll(cls, context):
         return context.area.type == "VIEW_3D"
+
+    @staticmethod
+    def edges_per_hexagon(face_type="NGON") -> int:
+        if face_type == "TRI":
+            return 6
+        elif face_type == "QUAD2":
+            return 6
+        elif face_type == "QUAD3":
+            return 6
+        elif face_type == "QUAD_CR":
+            return 8
+        elif face_type == "QUAD6":
+            return 12
+        elif face_type == "NGON":
+            return 6
+        elif face_type == "PENTA2":
+            return 8
+        elif face_type == "PENTA3":
+            return 9
+        elif face_type == "CATALAN_RAY":
+            return 6
+        elif face_type == "CATALAN_TRI":
+            return 6
+        elif face_type == "CATALAN_Z":
+            return 6
+        else:
+            return 0
 
     @staticmethod
     def faces_per_hexagon(face_type="NGON") -> int:
@@ -242,8 +300,6 @@ class HexGridMaker(bpy.types.Operator):
             return 4
         elif face_type == "CATALAN_Z":
             return 4
-        elif face_type == "WIRE":
-            return 0
         else:
             return 0
 
@@ -268,11 +324,11 @@ class HexGridMaker(bpy.types.Operator):
 
         # Intermediate calculations.
         sqrt_3 = 3.0 ** 0.5  # 1.7320508075688772
-        altitude = sqrt_3 * verif_rad
+        extent = sqrt_3 * verif_rad
         rad_1_5 = verif_rad * 1.5
         pad_rad = max(0.000001, verif_rad - verif_margin)
 
-        half_alt = altitude * 0.5
+        half_ext = extent * 0.5
         half_rad = pad_rad * 0.5
         rad_rt3_2 = half_rad * sqrt_3
 
@@ -285,12 +341,12 @@ class HexGridMaker(bpy.types.Operator):
         for i in range(i_min, i_max + 1):
             j_min = max(i_min, i_min - i)
             j_max = min(i_max, i_max - i)
-            i_alt = i * altitude
+            i_ext = i * extent
 
             for j in range(j_min, j_max + 1):
 
                 # Hexagon center.
-                x = i_alt + j * half_alt
+                x = i_ext + j * half_ext
                 y = j * rad_1_5
 
                 # Hexagon edges.
@@ -301,13 +357,17 @@ class HexGridMaker(bpy.types.Operator):
 
                 # Vertices on hexagon edge starting at the top center vertex, then
                 # moving counter- clockwise to the top right shoulder vertex.
-                hex_vs = [
-                    bm.verts.new((x, y + pad_rad, 0.0)),
-                    bm.verts.new((left, top, 0.0)),
-                    bm.verts.new((left, bottom, 0.0)),
-                    bm.verts.new((x, y - pad_rad, 0.0)),
-                    bm.verts.new((right, bottom, 0.0)),
-                    bm.verts.new((right, top, 0.0))]
+                if face_type == "POINTS":
+                    hex_vs = [bm.verts.new((x, y, 0.0))]
+                else:
+                    hex_vs = [
+                        bm.verts.new((x, y + pad_rad, 0.0)),
+                        bm.verts.new((left, top, 0.0)),
+                        bm.verts.new((left, bottom, 0.0)),
+                        bm.verts.new((x, y - pad_rad, 0.0)),
+                        bm.verts.new((right, bottom, 0.0)),
+                        bm.verts.new((right, top, 0.0))]
+
                 hex_faces = []
 
                 # Insert hexagon center for tri- and quad-fan face pattern.
@@ -477,8 +537,7 @@ class HexGridMaker(bpy.types.Operator):
                     bm.edges.new([hex_vs[4], hex_vs[5]])
                     bm.edges.new([hex_vs[5], hex_vs[0]])
 
-                else:
-                    # "NGON" is the default case.
+                elif face_type == "NGON":
                     hex_faces.append(bm.faces.new(hex_vs))
 
                 verts.append(hex_vs)
@@ -496,8 +555,21 @@ class HexGridMaker(bpy.types.Operator):
         bmesh.ops.rotate(bm, matrix=rot_mat, verts=bm.verts)
 
         # Ensure vertices have indices.
-        bm.verts.sort(key=HexGridMaker.vertex_comparator)
-        bm.verts.index_update()
+        # bm.verts.sort(key=HexGridMaker.vertex_comparator)
+        # bm.verts.index_update()
+
+        # TODO: Alternate, simpler way to find width and height?
+        # width: (cellradius * 2) * ((3 ** 0.5) * 0.5) * (rings * 2 - 1)
+
+        # Causes issues with extrusion (verts deleted.)
+        # bmesh.ops.bevel(
+        #     bm,
+        #     geom=bm.faces[:] + bm.edges[:] + bm.verts[:],
+        #     offset=15.0,
+        #     profile=0.5,
+        #     offset_type="PERCENT",
+        #     segments=3,
+        #     affect="VERTICES")
 
         # Find dimensions of grid.
         lb, ub = HexGridMaker.calc_dimensions(bm)
@@ -527,6 +599,8 @@ class HexGridMaker(bpy.types.Operator):
 
         return {
             "faces": faces,
+            "hex_count": 1 + i_max * verif_rings * 3,
+            "verif_merge": verif_merge,
             "width": width,
             "height": height}
 
@@ -537,18 +611,20 @@ class HexGridMaker(bpy.types.Operator):
             extrude_lb=0.000001,
             extrude_ub=1.0,
             terrain_type="UNIFORM",
-            noise_offset=(0.0, 0.0, 0.0),
+            noise_influence=0.0,
             noise_scale=1.0,
+            noise_offset=(0.0, 0.0, 0.0),
             noise_basis="BLENDER",
             origin=(-1.0, -1.0),
             dest=(1.0, 1.0),
-            merge_verts=False):
+            merge_verts=False) -> bool:
 
         # Validate input arguments.
         verif_lb = min(extrude_lb, extrude_ub)
         verif_ub = max(extrude_lb, extrude_ub)
+        verif_infl = max(0.0, min(noise_influence, 1.0))
         if verif_lb < 0.000001 and verif_ub < 0.000001:
-            return
+            return False
 
         if merge_verts:
             result = bmesh.ops.extrude_face_region(
@@ -563,8 +639,9 @@ class HexGridMaker(bpy.types.Operator):
                 if isinstance(elm, bmesh.types.BMVert):
                     new_verts.append(elm)
 
+            z = verif_ub
             bmesh.ops.translate(bm, verts=new_verts,
-                                vec=(0.0, 0.0, verif_ub))
+                                vec=(0.0, 0.0, z))
         else:
 
             # For linear gradient.
@@ -588,75 +665,55 @@ class HexGridMaker(bpy.types.Operator):
                     if isinstance(elm, bmesh.types.BMVert):
                         new_verts.append(elm)
 
-                if terrain_type == "NOISE":
+                # Find median point of hexagon.
+                point = mathutils.Vector((0.0, 0.0, 0.0))
+                for hex_face in hex_faces:
+                    point += hex_face.calc_center_median()
+                point /= len(hex_faces)
 
-                    # Find the center point of all the faces.
-                    center = mathutils.Vector((0.0, 0.0, 0.0))
-                    for hex_face in hex_faces:
-                        center += hex_face.calc_center_median()
-                    center /= len(hex_faces)
+                if terrain_type == "LINEAR":
 
-                    # Offset and scale the noise input.
-                    noise_in = noise_offset + noise_scale * center
+                    # Subtract the median from the gradient origin.
+                    a = (point[0] - origin[0],
+                         point[1] - origin[1])
 
-                    # Returns a value in [-1, 1] that needs to be converted to [0, 1].
-                    fac = mathutils.noise.noise(
-                        noise_in, noise_basis=noise_basis)
-                    fac *= 0.5
-                    fac += 0.5
-                    z = (1.0 - fac) * verif_lb + fac * verif_ub
-                    bmesh.ops.translate(bm, verts=new_verts, vec=(0.0, 0.0, z))
+                    # Find the clamped scalar projection.
+                    dot_ab = a[0] * b[0] + a[1] * b[1]
+                    scalar_proj = dot_ab * inv_dot_bb
+                    terrain_fac = max(0.0, min(1.0, scalar_proj))
 
                 elif terrain_type == "SPHERICAL":
 
-                    # Variant of above, doesn't use mathutils.Vector .
-                    point = [0.0, 0.0, 0.0]
-                    for hex_face in hex_faces:
-                        center = hex_face.calc_center_median()
-                        point[0] += center[0]
-                        point[1] += center[1]
-
-                    hex_count = len(hex_faces)
-                    inv_hex_count = 0.0 if hex_count == 0.0 else 1.0 / hex_count
-                    point[0] *= inv_hex_count
-                    point[1] *= inv_hex_count
-
+                    # Find distance from origin to point.
                     a = (point[0] - origin[0],
                          point[1] - origin[1])
+
+                    # Divide distance squared by max distance squared.
                     dot_aa = a[0] ** 2 + a[1] ** 2
-                    fac = max(0.0, min(1.0, dot_aa * inv_dot_bb))
-                    z = (1.0 - fac) * verif_ub + fac * verif_lb
-                    bmesh.ops.translate(bm, verts=new_verts, vec=(0.0, 0.0, z))
-
-                elif terrain_type == "LINEAR":
-
-                    # Variant of above, doesn't use mathutils.Vector .
-                    point = [0.0, 0.0, 0.0]
-                    for hex_face in hex_faces:
-                        center = hex_face.calc_center_median()
-                        point[0] += center[0]
-                        point[1] += center[1]
-
-                    hex_count = len(hex_faces)
-                    inv_hex_count = 0.0 if hex_count == 0.0 else 1.0 / hex_count
-                    point[0] *= inv_hex_count
-                    point[1] *= inv_hex_count
-
-                    a = (point[0] - origin[0],
-                         point[1] - origin[1])
-
-                    dot_ab = a[0] * b[0] + a[1] * b[1]
-                    fac = max(0.0, min(1.0, dot_ab * inv_dot_bb))
-                    z = (1.0 - fac) * verif_lb + fac * verif_ub
-                    bmesh.ops.translate(bm, verts=new_verts, vec=(0.0, 0.0, z))
+                    norm_dot = dot_aa * inv_dot_bb
+                    terrain_fac = 1.0 - max(0.0, min(1.0, norm_dot))
 
                 else:
 
-                    # "UNIFORM" is the default case.
-                    bmesh.ops.translate(bm, verts=new_verts,
-                                        vec=(0.0, 0.0, verif_ub))
+                    # UNIFORM is default.
+                    terrain_fac = 1.0
+
+                # Offset and scale the noise input.
+                noise_in = noise_offset + noise_scale * point
+
+                # Returns a value in [-1, 1] that needs to be converted to [0, 1].
+                noise_fac = 0.5 + 0.5 * mathutils.noise.noise(
+                    noise_in, noise_basis=noise_basis)
+
+                # TODO Instead have a noise contribution in [0,1]
+                # fac = noise_fac * terrain_fac
+                fac = (1.0 - verif_infl) * terrain_fac + verif_infl * noise_fac
+                z = (1.0 - fac) * verif_lb + fac * verif_ub
+                bmesh.ops.translate(bm, verts=new_verts, vec=(0.0, 0.0, z))
 
         bm.normal_update()
+
+        return True
 
     @staticmethod
     def calc_dimensions(bm=None) -> tuple:
