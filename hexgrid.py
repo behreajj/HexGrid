@@ -117,7 +117,8 @@ class HexGridMaker(bpy.types.Operator):
         items=[
             ("UNIFORM", "Uniform", "Extrude by a uniform amount", 1),
             ("LINEAR", "Linear", "Linear gradient", 2),
-            ("SPHERICAL", "Spherical", "Spherical gradient", 3)],
+            ("SPHERICAL", "Spherical", "Spherical gradient", 3),
+            ("CONIC", "Conic", "Conic gradient", 4)],
         name="Terrain Type",
         default="UNIFORM",
         description="How to extrude each hexagon cell")
@@ -223,7 +224,7 @@ class HexGridMaker(bpy.types.Operator):
         mesh_obj.rotation_mode = "QUATERNION"
         context.scene.collection.objects.link(mesh_obj)
 
-        #TODO: Make this optional... Turn on/off one vertex group
+        # TODO: Make this optional... Turn on/off one vertex group
         # with all or separate vert groups?
 
         # fph = HexGridMaker.faces_per_hexagon(
@@ -548,16 +549,9 @@ class HexGridMaker(bpy.types.Operator):
         if verif_merge:
             bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.000001)
 
-        # Transform BMesh.
-        # Do this before assigning UVs so that they are orthonormal
-        # regardless of world coordinates.
-        rot_mat = mathutils.Matrix.Rotation(
-            orientation, 4, (0.0, 0.0, 1.0))
-        bmesh.ops.rotate(bm, matrix=rot_mat, verts=bm.verts)
-
         # Ensure vertices have indices.
-        # bm.verts.sort(key=HexGridMaker.vertex_comparator)
-        # bm.verts.index_update()
+        bm.verts.sort(key=HexGridMaker.vertex_comparator)
+        bm.verts.index_update()
 
         # Causes issues with extrusion (verts deleted.)
         # bmesh.ops.bevel(
@@ -573,6 +567,7 @@ class HexGridMaker(bpy.types.Operator):
         # lb, ub = HexGridMaker.calc_dimensions(bm)
         # width = ub[0] - lb[0]
         # height = ub[1] - lb[1]
+
         width = cell_radius * sqrt_3 * (rings * 2 - 1)
         height = 2 * cell_radius * rings + cell_radius * (rings - 1)
         half_width = width * 0.5
@@ -597,6 +592,11 @@ class HexGridMaker(bpy.types.Operator):
         for face in bm.faces:
             for loop in face.loops:
                 loop[uv_layer].uv = vts[loop.vert.index]
+
+        # Transform BMesh.
+        rot_mat = mathutils.Matrix.Rotation(
+            orientation, 4, (0.0, 0.0, 1.0))
+        bmesh.ops.rotate(bm, matrix=rot_mat, verts=bm.verts)
 
         # Update normals, jic.
         bm.normal_update()
@@ -654,6 +654,9 @@ class HexGridMaker(bpy.types.Operator):
             dot_bb = b[0] ** 2 + b[1] ** 2
             inv_dot_bb = 0.0 if dot_bb == 0.0 else 1.0 / dot_bb
 
+            # For conic gradient.
+            offset_ang = math.atan2(b[1], b[0])
+
             for hex_faces in faces:
 
                 # Extrude does not translate.
@@ -697,6 +700,13 @@ class HexGridMaker(bpy.types.Operator):
                     norm_dot = dot_aa * inv_dot_bb
                     terrain_fac = 1.0 - max(0.0, min(1.0, norm_dot))
 
+                elif terrain_type == "CONIC":
+
+                    ang = (offset_ang - math.atan2(
+                        point[1] - origin[1],
+                        point[0] - origin[0])) % math.tau
+                    terrain_fac = ang / math.tau
+
                 else:
 
                     # UNIFORM is default.
@@ -709,9 +719,12 @@ class HexGridMaker(bpy.types.Operator):
                 noise_fac = 0.5 + 0.5 * mathutils.noise.noise(
                     noise_in, noise_basis=noise_basis)
 
-                # fac = noise_fac * terrain_fac
+                # Factor in noise contribution, then lerp from
+                # lower bound to upper bound.
                 fac = (1.0 - verif_infl) * terrain_fac + verif_infl * noise_fac
                 z = (1.0 - fac) * verif_lb + fac * verif_ub
+
+                # Translate.
                 bmesh.ops.translate(bm, verts=new_verts, vec=(0.0, 0.0, z))
 
         bm.normal_update()
