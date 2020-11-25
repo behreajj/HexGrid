@@ -225,23 +225,24 @@ class HexGridMaker(bpy.types.Operator):
 
         #TODO: Make this optional... Turn on/off one vertex group
         # with all or separate vert groups?
-        fph = HexGridMaker.faces_per_hexagon(
-            face_type=self.face_type)
-        if extruded:
-            fph *= 2
-            fph += HexGridMaker.edges_per_hexagon(
-                face_type=self.face_type)
-        hex_count = result["hex_count"]
 
-        vert_group = mesh_obj.vertex_groups.new(name="All")
-        mesh_polys = mesh_data.polygons
-        to_fac = 1.0 / (hex_count - 1.0)
+        # fph = HexGridMaker.faces_per_hexagon(
+        #     face_type=self.face_type)
+        # if extruded:
+        #     fph *= 2
+        #     fph += HexGridMaker.edges_per_hexagon(
+        #         face_type=self.face_type)
+        # hex_count = result["hex_count"]
 
-        for mesh_poly in mesh_polys:
-            poly_index = mesh_poly.index
-            poly_vert_idcs = mesh_poly.vertices
-            fac = (poly_index // fph) * to_fac
-            vert_group.add(poly_vert_idcs, fac, "REPLACE")
+        # vert_group = mesh_obj.vertex_groups.new(name="All")
+        # mesh_polys = mesh_data.polygons
+        # to_fac = 1.0 / (hex_count - 1.0) if hex_count > 1 else 1.0
+
+        # for mesh_poly in mesh_polys:
+        #     poly_index = mesh_poly.index
+        #     poly_vert_idcs = mesh_poly.vertices
+        #     fac = (poly_index // fph) * to_fac
+        #     vert_group.add(poly_vert_idcs, fac, "REPLACE")
 
         return {"FINISHED"}
 
@@ -558,9 +559,6 @@ class HexGridMaker(bpy.types.Operator):
         # bm.verts.sort(key=HexGridMaker.vertex_comparator)
         # bm.verts.index_update()
 
-        # TODO: Alternate, simpler way to find width and height?
-        # width: (cellradius * 2) * ((3 ** 0.5) * 0.5) * (rings * 2 - 1)
-
         # Causes issues with extrusion (verts deleted.)
         # bmesh.ops.bevel(
         #     bm,
@@ -572,9 +570,13 @@ class HexGridMaker(bpy.types.Operator):
         #     affect="VERTICES")
 
         # Find dimensions of grid.
-        lb, ub = HexGridMaker.calc_dimensions(bm)
-        width = ub[0] - lb[0]
-        height = ub[1] - lb[1]
+        # lb, ub = HexGridMaker.calc_dimensions(bm)
+        # width = ub[0] - lb[0]
+        # height = ub[1] - lb[1]
+        width = cell_radius * sqrt_3 * (rings * 2 - 1)
+        height = 2 * cell_radius * rings + cell_radius * (rings - 1)
+        half_width = width * 0.5
+        half_height = height * 0.5
         x_inv = 1.0 / width
         y_inv = 1.0 / height
 
@@ -584,8 +586,10 @@ class HexGridMaker(bpy.types.Operator):
         vts = []
         for vert in bm.verts:
             v = vert.co
-            vt_x = (v[0] - lb[0]) * x_inv
-            vt_y = (v[1] - lb[1]) * y_inv
+            # vt_x = (v[0] - lb[0]) * x_inv
+            # vt_y = (v[1] - lb[1]) * y_inv
+            vt_x = (v[0] + half_width) * x_inv
+            vt_y = (v[1] + half_height) * y_inv
             vts.append((vt_x, vt_y))
 
         # Create or verify UV Map.
@@ -705,7 +709,6 @@ class HexGridMaker(bpy.types.Operator):
                 noise_fac = 0.5 + 0.5 * mathutils.noise.noise(
                     noise_in, noise_basis=noise_basis)
 
-                # TODO Instead have a noise contribution in [0,1]
                 # fac = noise_fac * terrain_fac
                 fac = (1.0 - verif_infl) * terrain_fac + verif_infl * noise_fac
                 z = (1.0 - fac) * verif_lb + fac * verif_ub
