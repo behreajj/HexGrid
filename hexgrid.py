@@ -1,5 +1,4 @@
 import bpy
-
 import bmesh
 import math
 import mathutils
@@ -200,9 +199,8 @@ class HexGridMaker(bpy.types.Operator):
             orientation=self.orientation,
             merge_verts=self.merge_verts)
 
-        extruded = False
         if self.face_type not in ["WIRE", "POINTS"]:
-            extruded = HexGridMaker.extrude_hexagons(
+            HexGridMaker.extrude_hexagons(
                 bm=bm,
                 faces=result["faces"],
                 extrude_lb=self.extrude_lb,
@@ -223,27 +221,6 @@ class HexGridMaker(bpy.types.Operator):
         mesh_obj = bpy.data.objects.new(mesh_data.name, mesh_data)
         mesh_obj.rotation_mode = "QUATERNION"
         context.scene.collection.objects.link(mesh_obj)
-
-        # TODO: Make this optional... Turn on/off one vertex group
-        # with all or separate vert groups?
-
-        # fph = HexGridMaker.faces_per_hexagon(
-        #     face_type=self.face_type)
-        # if extruded:
-        #     fph *= 2
-        #     fph += HexGridMaker.edges_per_hexagon(
-        #         face_type=self.face_type)
-        # hex_count = result["hex_count"]
-
-        # vert_group = mesh_obj.vertex_groups.new(name="All")
-        # mesh_polys = mesh_data.polygons
-        # to_fac = 1.0 / (hex_count - 1.0) if hex_count > 1 else 1.0
-
-        # for mesh_poly in mesh_polys:
-        #     poly_index = mesh_poly.index
-        #     poly_vert_idcs = mesh_poly.vertices
-        #     fac = (poly_index // fph) * to_fac
-        #     vert_group.add(poly_vert_idcs, fac, "REPLACE")
 
         return {"FINISHED"}
 
@@ -329,8 +306,9 @@ class HexGridMaker(bpy.types.Operator):
         extent = sqrt_3 * verif_rad
         rad_1_5 = verif_rad * 1.5
         pad_rad = max(0.000001, verif_rad - verif_margin)
-
         half_ext = extent * 0.5
+
+        # Added to hexagon center to find corners.
         half_rad = pad_rad * 0.5
         rad_rt3_2 = half_rad * sqrt_3
 
@@ -340,6 +318,8 @@ class HexGridMaker(bpy.types.Operator):
         verts = []
         faces = []
 
+        # See https://www.redblobgames.com/grids/
+        #     hexagons/implementation.html#shape-hexagon
         for i in range(i_min, i_max + 1):
             j_min = max(i_min, i_min - i)
             j_max = min(i_max, i_max - i)
@@ -372,8 +352,8 @@ class HexGridMaker(bpy.types.Operator):
 
                 hex_faces = []
 
-                # Insert hexagon center for tri- and quad-fan face pattern.
                 if face_type == "TRI":
+                    # Insert hexagon center for fan patterns.
                     hex_vs.insert(0, bm.verts.new((x, y, 0.0)))
 
                     # Six triangles.
@@ -550,26 +530,13 @@ class HexGridMaker(bpy.types.Operator):
             bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.000001)
 
         # Ensure vertices have indices.
-        bm.verts.sort(key=HexGridMaker.vertex_comparator)
-        bm.verts.index_update()
-
-        # Causes issues with extrusion (verts deleted.)
-        # bmesh.ops.bevel(
-        #     bm,
-        #     geom=bm.faces[:] + bm.edges[:] + bm.verts[:],
-        #     offset=15.0,
-        #     profile=0.5,
-        #     offset_type="PERCENT",
-        #     segments=3,
-        #     affect="VERTICES")
+        # bm.verts.sort(key=HexGridMaker.vertex_comparator)
+        # bm.verts.index_update()
 
         # Find dimensions of grid.
-        # lb, ub = HexGridMaker.calc_dimensions(bm)
-        # width = ub[0] - lb[0]
-        # height = ub[1] - lb[1]
-
-        width = cell_radius * sqrt_3 * (rings * 2 - 1)
-        height = 2 * cell_radius * rings + cell_radius * (rings - 1)
+        ver_rng_2 = verif_rings * 2
+        width = extent * (ver_rng_2 - 1)
+        height = verif_rad * ver_rng_2 + verif_rad * i_max
         half_width = width * 0.5
         half_height = height * 0.5
         x_inv = 1.0 / width
@@ -578,20 +545,13 @@ class HexGridMaker(bpy.types.Operator):
         # Calculate UV coordinates.
         # This will stretch UVs to fill map, without
         # preserving aspect ratio (width / height).
-        vts = []
-        for vert in bm.verts:
-            v = vert.co
-            # vt_x = (v[0] - lb[0]) * x_inv
-            # vt_y = (v[1] - lb[1]) * y_inv
-            vt_x = (v[0] + half_width) * x_inv
-            vt_y = (v[1] + half_height) * y_inv
-            vts.append((vt_x, vt_y))
-
-        # Create or verify UV Map.
         uv_layer = bm.loops.layers.uv.verify()
         for face in bm.faces:
             for loop in face.loops:
-                loop[uv_layer].uv = vts[loop.vert.index]
+                co = loop.vert.co
+                u = (co.x + half_width) * x_inv
+                v = (co.y + half_height) * y_inv
+                loop[uv_layer].uv = (u, v)
 
         # Transform BMesh.
         rot_mat = mathutils.Matrix.Rotation(
@@ -730,34 +690,6 @@ class HexGridMaker(bpy.types.Operator):
         bm.normal_update()
 
         return True
-
-    @staticmethod
-    def calc_dimensions(bm=None) -> tuple:
-
-        # Initialize to an arbitrarily large +/- value.
-        lb = [1000000.0, 1000000.0, 1000000.0]
-        ub = [-1000000.0, -1000000.0, -1000000.0]
-
-        verts = bm.verts
-        for vert in verts:
-            co = vert.co
-
-            lb[0] = min(co[0], lb[0])
-            lb[1] = min(co[1], lb[1])
-            lb[2] = min(co[2], lb[2])
-
-            ub[0] = max(co[0], ub[0])
-            ub[1] = max(co[1], ub[1])
-            ub[2] = max(co[2], ub[2])
-
-        return lb, ub
-
-    @staticmethod
-    def vertex_comparator(a) -> float:
-        aco = a.co
-        heading = math.atan2(aco[1], aco[0]) % math.tau
-        mag = (aco[0] ** 2 + aco[1] ** 2 + aco[2] ** 2) ** 0.5
-        return heading * mag
 
 
 def menu_func(self, context):
