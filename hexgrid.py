@@ -219,7 +219,6 @@ class HexGridMaker(bpy.types.Operator):
         bm.free()
 
         mesh_obj = bpy.data.objects.new(mesh_data.name, mesh_data)
-        mesh_obj.rotation_mode = "QUATERNION"
         context.scene.collection.objects.link(mesh_obj)
 
         return {"FINISHED"}
@@ -581,7 +580,7 @@ class HexGridMaker(bpy.types.Operator):
             noise_basis="BLENDER",
             origin=(-1.0, -1.0),
             dest=(1.0, 1.0),
-            merge_verts=False) -> bool:
+            merge_verts=False):
 
         # Validate input arguments.
         verif_lb = min(extrude_lb, extrude_ub)
@@ -590,6 +589,7 @@ class HexGridMaker(bpy.types.Operator):
         if verif_lb < 0.000001 and verif_ub < 0.000001:
             return False
 
+        # If vertices are merged, only uniform allowed.
         if merge_verts:
             result = bmesh.ops.extrude_face_region(
                 bm,
@@ -631,18 +631,18 @@ class HexGridMaker(bpy.types.Operator):
                 for elm in geom:
                     if isinstance(elm, bmesh.types.BMVert):
                         new_verts.append(elm)
-
+                        
                 # Find median point of hexagon.
                 point = mathutils.Vector((0.0, 0.0, 0.0))
                 for hex_face in hex_faces:
                     point += hex_face.calc_center_median()
                 point /= len(hex_faces)
 
-                if terrain_type == "LINEAR":
+                # Find distance from origin to point.
+                a = (point[0] - origin[0],
+                     point[1] - origin[1])
 
-                    # Subtract the median from the gradient origin.
-                    a = (point[0] - origin[0],
-                         point[1] - origin[1])
+                if terrain_type == "LINEAR":
 
                     # Find the clamped scalar projection.
                     dot_ab = a[0] * b[0] + a[1] * b[1]
@@ -651,10 +651,6 @@ class HexGridMaker(bpy.types.Operator):
 
                 elif terrain_type == "SPHERICAL":
 
-                    # Find distance from origin to point.
-                    a = (point[0] - origin[0],
-                         point[1] - origin[1])
-
                     # Divide distance squared by max distance squared.
                     dot_aa = a[0] ** 2 + a[1] ** 2
                     norm_dot = dot_aa * inv_dot_bb
@@ -662,9 +658,7 @@ class HexGridMaker(bpy.types.Operator):
 
                 elif terrain_type == "CONIC":
 
-                    ang = (offset_ang - math.atan2(
-                        point[1] - origin[1],
-                        point[0] - origin[0])) % math.tau
+                    ang = (offset_ang - math.atan2(a[1], a[0])) % math.tau
                     terrain_fac = ang / math.tau
 
                 else:
@@ -673,14 +667,15 @@ class HexGridMaker(bpy.types.Operator):
                     terrain_fac = 1.0
 
                 # Offset and scale the noise input.
-                noise_in = noise_offset + noise_scale * point
+                noise_in = (noise_scale * point[0] + noise_offset[0],
+                            noise_scale * point[1] + noise_offset[1],
+                            noise_scale * point[2] + noise_offset[2])
 
                 # Returns a value in [-1, 1] that needs to be converted to [0, 1].
                 noise_fac = 0.5 + 0.5 * mathutils.noise.noise(
                     noise_in, noise_basis=noise_basis)
 
-                # Factor in noise contribution, then lerp from
-                # lower bound to upper bound.
+                # Factor in noise contribution, then lerp from lower to upper.
                 fac = (1.0 - verif_infl) * terrain_fac + verif_infl * noise_fac
                 z = (1.0 - fac) * verif_lb + fac * verif_ub
 
@@ -688,7 +683,6 @@ class HexGridMaker(bpy.types.Operator):
                 bmesh.ops.translate(bm, verts=new_verts, vec=(0.0, 0.0, z))
 
         bm.normal_update()
-
         return True
 
 
