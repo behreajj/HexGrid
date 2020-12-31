@@ -71,25 +71,26 @@ class HexGridMaker(bpy.types.Operator):
     face_type: EnumProperty(
         items=[
             ("NGON", "NGon", "Fill with a hexagon", 1),
+            ("PENTA2", "Pentagon Split", "Split with 2 pentagons on a central axis", 2),
             ("PENTA3", "Pentagon Fan",
-             "Fill with 3 pentagons sharing a central vertex; creates 3 extra vertices", 2),
-            ("QUAD6", "Quad 6 Fan",
-             "Fill with 6 quadrilaterals sharing a central vertex; creates 6 extra vertices", 3),
+             "Fill with 3 pentagons sharing a central vertex; creates 3 extra vertices", 3),
+            ("QUAD2", "Quad Split", "Split with 2 quadrilaterlas on a central axis", 4),
             ("QUAD3", "Quad 3 Fan",
-             "Fill with 3 quadrilaterals sharing a central vertex", 4),
-            ("TRI", "Tri Fan", "Fill with 6 triangles sharing a central vertex", 5),
+             "Fill with 3 quadrilaterals sharing a central vertex", 5),
             ("QUAD_CR", "Quad Cross",
              "Fill with 4 quadrilaterals sharing a central vertex; creates 2 extra vertices", 6),
-            ("QUAD2", "Quad Split", "Split with 2 quadrilaterlas on a central axis", 7),
-            ("PENTA2", "Penta Split", "Split with 2 pentagons on a central axis", 8),
+            ("QUAD6", "Quad 6 Fan",
+             "Fill with 6 quadrilaterals sharing a central vertex; creates 6 extra vertices", 7),
             ("CATALAN_RAY", "Catalan Ray",
-             "Fills with triangles by connecting a corner to non-adjacent vertices", 9),
+             "Fills with triangles by connecting a corner to non-adjacent vertices", 8),
             ("CATALAN_TRI", "Catalan Tri",
-             "Fill with a central tri surrounded by 3 peripheral tris", 10),
+             "Fill with a central tri surrounded by 3 peripheral tris", 9),
             ("CATALAN_Z", "Catalan Z",
-             "Fill with 4 triangles, with edges forming a z pattern", 11),
+             "Fill with 4 triangles, with edges forming a z pattern", 10),
+            ("TRI", "Tri Fan", "Fill with 6 triangles sharing a central vertex", 11),
             ("WIRE", "Wire", "Do not fill; use only edges", 12),
             ("POINTS", "Points", "Create only center points", 13)],
+
         name="Face Type",
         default="NGON",
         description="How to fill each hexagon cell")
@@ -187,6 +188,20 @@ class HexGridMaker(bpy.types.Operator):
         default="BLENDER",
         description="Underlying noise algorithm to use")
 
+    auto_normals: BoolProperty(
+        name="Auto Smooth",
+        description="Auto smooth (based on smooth/sharp faces/edges and angle between faces)",
+        default=True)
+
+    auto_angle: FloatProperty(
+        name="Auto Smooth Angle",
+        description="Maximum angle between face normals that will be considered as smooth",
+        subtype="ANGLE",
+        min=0.0,
+        max=3.14159,
+        step=100,
+        default=0.523599)
+
     def execute(self, context):
         bm = bmesh.new()
 
@@ -218,7 +233,11 @@ class HexGridMaker(bpy.types.Operator):
         bm.to_mesh(mesh_data)
         bm.free()
 
+        mesh_data.use_auto_smooth = self.auto_normals
+        mesh_data.auto_smooth_angle = self.auto_angle
+
         mesh_obj = bpy.data.objects.new(mesh_data.name, mesh_data)
+        mesh_obj.location = context.scene.cursor.location
         context.scene.collection.objects.link(mesh_obj)
 
         return {"FINISHED"}
@@ -631,7 +650,7 @@ class HexGridMaker(bpy.types.Operator):
                 for elm in geom:
                     if isinstance(elm, bmesh.types.BMVert):
                         new_verts.append(elm)
-                        
+
                 # Find median point of hexagon.
                 point = mathutils.Vector((0.0, 0.0, 0.0))
                 for hex_face in hex_faces:
