@@ -13,8 +13,8 @@ from bpy.props import (
 bl_info = {
     "name": "Create Hex Grid",
     "author": "Jeremy Behreandt",
-    "version": (0, 1),
-    "blender": (2, 90, 1),
+    "version": (0, 2),
+    "blender": (4, 1, 0),
     "category": "Add Mesh",
     "description": "Creates a hexagon grid.",
     "tracker_url": "https://github.com/behreajj/HexGrid"
@@ -188,20 +188,6 @@ class HexGridMaker(bpy.types.Operator):
         default="BLENDER",
         description="Underlying noise algorithm to use")
 
-    auto_normals: BoolProperty(
-        name="Auto Smooth",
-        description="Auto smooth (based on smooth/sharp faces/edges and angle between faces)",
-        default=True)
-
-    auto_angle: FloatProperty(
-        name="Auto Smooth Angle",
-        description="Maximum angle between face normals that will be considered as smooth",
-        subtype="ANGLE",
-        min=0.0,
-        max=3.14159,
-        step=100,
-        default=0.523599)
-
     def execute(self, context):
         bm = bmesh.new()
 
@@ -232,9 +218,6 @@ class HexGridMaker(bpy.types.Operator):
         mesh_data = bpy.data.meshes.new("Hex.Grid")
         bm.to_mesh(mesh_data)
         bm.free()
-
-        mesh_data.use_auto_smooth = self.auto_normals
-        mesh_data.auto_smooth_angle = self.auto_angle
 
         mesh_obj = bpy.data.objects.new(mesh_data.name, mesh_data)
         mesh_obj.location = context.scene.cursor.location
