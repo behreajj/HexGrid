@@ -159,12 +159,13 @@ class HexGridCurveMaker(bpy.types.Operator):
 
                 # Hexagon vertices, beginning at top center
                 # moving counter clockwise.
-                v0 = (x, y + pad_rad, 0.0)
-                v1 = (left, top, 0.0)
-                v2 = (left, bottom, 0.0)
-                v3 = (x, y - pad_rad, 0.0)
-                v4 = (right, bottom, 0.0)
-                v5 = (right, top, 0.0)
+                v = [
+                    (x, y + pad_rad, 0.0),
+                    (left, top, 0.0),
+                    (left, bottom, 0.0),
+                    (x, y - pad_rad, 0.0),
+                    (right, bottom, 0.0),
+                    (right, top, 0.0) ]
 
                 spline = crv_splines.new("BEZIER")
                 spline.use_cyclic_u = True
@@ -173,215 +174,91 @@ class HexGridCurveMaker(bpy.types.Operator):
 
                 if is_straight:
                     bz_pts.add(5)
-                    kn0 = bz_pts[0]
-                    kn1 = bz_pts[1]
-                    kn2 = bz_pts[2]
-                    kn3 = bz_pts[3]
-                    kn4 = bz_pts[4]
-                    kn5 = bz_pts[5]
-                    
-                    kn0.co = v0
-                    kn1.co = v1
-                    kn2.co = v2
-                    kn3.co = v3
-                    kn4.co = v4
-                    kn5.co = v5
 
-                    kn0.handle_left_type = straight_edge
-                    kn1.handle_left_type = straight_edge
-                    kn2.handle_left_type = straight_edge
-                    kn3.handle_left_type = straight_edge
-                    kn4.handle_left_type = straight_edge
-                    kn5.handle_left_type = straight_edge
+                    kn_idx_curr = 0
+                    for kn in bz_pts:
+                        kn_idx_prev = (kn_idx_curr - 1) % 6
+                        kn_idx_next = (kn_idx_curr + 1) % 6
 
-                    kn0.handle_right_type = straight_edge
-                    kn1.handle_right_type = straight_edge
-                    kn2.handle_right_type = straight_edge
-                    kn3.handle_right_type = straight_edge
-                    kn4.handle_right_type = straight_edge
-                    kn5.handle_right_type = straight_edge
+                        co_curr = v[kn_idx_curr]
+                        co_prev = v[kn_idx_prev]
+                        co_next = v[kn_idx_next]
 
-                    kn0.handle_left = (
-                        t_3 * v0[0] + o_3 * v5[0],
-                        t_3 * v0[1] + o_3 * v5[1],
-                        t_3 * v0[2] + o_3 * v5[2])
-                    kn1.handle_left = (
-                        t_3 * v1[0] + o_3 * v0[0],
-                        t_3 * v1[1] + o_3 * v0[1],
-                        t_3 * v1[2] + o_3 * v0[2])
-                    kn2.handle_left = (
-                        t_3 * v2[0] + o_3 * v1[0],
-                        t_3 * v2[1] + o_3 * v1[1],
-                        t_3 * v2[2] + o_3 * v1[2])
-                    kn3.handle_left = (
-                        t_3 * v3[0] + o_3 * v2[0],
-                        t_3 * v3[1] + o_3 * v2[1],
-                        t_3 * v3[2] + o_3 * v2[2])
-                    kn4.handle_left = (
-                        t_3 * v4[0] + o_3 * v3[0],
-                        t_3 * v4[1] + o_3 * v3[1],
-                        t_3 * v4[2] + o_3 * v3[2])
-                    kn5.handle_left = (
-                        t_3 * v5[0] + o_3 * v4[0],
-                        t_3 * v5[1] + o_3 * v4[1],
-                        t_3 * v5[2] + o_3 * v4[2])
+                        kn.co = co_curr
+                        kn.handle_left_type = straight_edge
+                        kn.handle_right_type = straight_edge
+                        kn.handle_left = (
+                            t_3 * co_curr[0] + o_3 * co_prev[0],
+                            t_3 * co_curr[1] + o_3 * co_prev[1],
+                            t_3 * co_curr[2] + o_3 * co_prev[2])
+                        kn.handle_right = (
+                            t_3 * co_curr[0] + o_3 * co_next[0],
+                            t_3 * co_curr[1] + o_3 * co_next[1],
+                            t_3 * co_curr[2] + o_3 * co_next[2])
 
-                    kn0.handle_right = (
-                        t_3 * v0[0] + o_3 * v1[0],
-                        t_3 * v0[1] + o_3 * v1[1],
-                        t_3 * v0[2] + o_3 * v1[2])
-                    kn1.handle_right = (
-                        t_3 * v1[0] + o_3 * v2[0],
-                        t_3 * v1[1] + o_3 * v2[1],
-                        t_3 * v1[2] + o_3 * v2[2])
-                    kn2.handle_right = (
-                        t_3 * v2[0] + o_3 * v3[0],
-                        t_3 * v2[1] + o_3 * v3[1],
-                        t_3 * v2[2] + o_3 * v3[2])
-                    kn3.handle_right = (
-                        t_3 * v3[0] + o_3 * v4[0],
-                        t_3 * v3[1] + o_3 * v4[1],
-                        t_3 * v3[2] + o_3 * v4[2])
-                    kn4.handle_right = (
-                        t_3 * v4[0] + o_3 * v5[0],
-                        t_3 * v4[1] + o_3 * v5[1],
-                        t_3 * v4[2] + o_3 * v5[2])
-                    kn5.handle_right = (
-                        t_3 * v5[0] + o_3 * v0[0],
-                        t_3 * v5[1] + o_3 * v0[1],
-                        t_3 * v5[2] + o_3 * v0[2])
+                        kn_idx_curr = kn_idx_curr + 1
                 else:
                     # Calculate midpoints.
-                    mp0 = (
-                        (v0[0] + v1[0]) * 0.5,
-                        (v0[1] + v1[1]) * 0.5,
-                        (v0[2] + v1[2]) * 0.5)
-                    mp1 = (
-                        (v1[0] + v2[0]) * 0.5,
-                        (v1[1] + v2[1]) * 0.5,
-                        (v1[2] + v2[2]) * 0.5)
-                    mp2 = (
-                        (v2[0] + v3[0]) * 0.5,
-                        (v2[1] + v3[1]) * 0.5,
-                        (v2[2] + v3[2]) * 0.5)
-                    mp3 = (
-                        (v3[0] + v4[0]) * 0.5,
-                        (v3[1] + v4[1]) * 0.5,
-                        (v3[2] + v4[2]) * 0.5)
-                    mp4 = (
-                        (v4[0] + v5[0]) * 0.5,
-                        (v4[1] + v5[1]) * 0.5,
-                        (v4[2] + v5[2]) * 0.5)
-                    mp5 = (
-                        (v5[0] + v0[0]) * 0.5,
-                        (v5[1] + v0[1]) * 0.5,
-                        (v5[2] + v0[2]) * 0.5)
+                    mp = [(0.0, 0.0, 0.0)] * 6
+                    for mp_idx in range(0, 6):
+                        mp_idx_next = (mp_idx + 1) % 6
+                        v_curr = v[mp_idx]
+                        v_next = v[mp_idx_next]
+                        mp[mp_idx] = (
+                            (v_curr[0] + v_next[0]) * 0.5,
+                            (v_curr[1] + v_next[1]) * 0.5,
+                            (v_curr[2] + v_next[2]) * 0.5)
 
                     if is_circle:
                         bz_pts.add(5)
-                        kn0 = bz_pts[0]
-                        kn1 = bz_pts[1]
-                        kn2 = bz_pts[2]
-                        kn3 = bz_pts[3]
-                        kn4 = bz_pts[4]
-                        kn5 = bz_pts[5]
 
-                        kn0.co = mp0
-                        kn1.co = mp1
-                        kn2.co = mp2
-                        kn3.co = mp3
-                        kn4.co = mp4
-                        kn5.co = mp5
-
-                        kn0.handle_left_type = "FREE"
-                        kn1.handle_left_type = "FREE"
-                        kn2.handle_left_type = "FREE"
-                        kn3.handle_left_type = "FREE"
-                        kn4.handle_left_type = "FREE"
-                        kn5.handle_left_type = "FREE"
-
-                        kn0.handle_right_type = "FREE"
-                        kn1.handle_right_type = "FREE"
-                        kn2.handle_right_type = "FREE"
-                        kn3.handle_right_type = "FREE"
-                        kn4.handle_right_type = "FREE"
-                        kn5.handle_right_type = "FREE"
-
-                        #TODO: Set left and right handles.
+                        kn_idx_curr = 0
+                        for kn in bz_pts:
+                            kn.co = mp[kn_idx_curr]
+                            kn.handle_left_type = "FREE"
+                            kn.handle_right_type = "FREE"
+                            # TODO: Calculate tuples for handle_left and handle_right
+                            kn_idx_curr = kn_idx_curr + 1
                     else:
                         # https://github.com/behreajj/CamZup/blob/f0adca3a58aab7568bf60ccc15e67f35d326d72d/src/camzup/core/Curve2.java#L1041
                         # https://github.com/behreajj/CamZup/blob/00696e7d3b28fa416ed5207029f870b6a6f656ef/src/camzup/core/Mesh2.java#L764
 
-                        co00_l = (
-                            one_round * v0[0] + verif_rounding * mp5[0],
-                            one_round * v0[1] + verif_rounding * mp5[1],
-                            one_round * v0[2] + verif_rounding * mp5[2])
-                        co01_r = (
-                            one_round * v0[0] + verif_rounding * mp0[0],
-                            one_round * v0[1] + verif_rounding * mp0[1],
-                            one_round * v0[2] + verif_rounding * mp0[2])
-                        
-                        co02_l = (
-                            one_round * v1[0] + verif_rounding * mp0[0],
-                            one_round * v1[1] + verif_rounding * mp0[1],
-                            one_round * v1[2] + verif_rounding * mp0[2])
-                        co03_r = (
-                            one_round * v1[0] + verif_rounding * mp1[0],
-                            one_round * v1[1] + verif_rounding * mp1[1],
-                            one_round * v1[2] + verif_rounding * mp1[2])
-                        
-                        co04_l = (
-                            one_round * v2[0] + verif_rounding * mp1[0],
-                            one_round * v2[1] + verif_rounding * mp1[1],
-                            one_round * v2[2] + verif_rounding * mp1[2])
-                        co05_r = (
-                            one_round * v2[0] + verif_rounding * mp2[0],
-                            one_round * v2[1] + verif_rounding * mp2[1],
-                            one_round * v2[2] + verif_rounding * mp2[2])
-                        
-                        co06_l = (
-                            one_round * v3[0] + verif_rounding * mp2[0],
-                            one_round * v3[1] + verif_rounding * mp2[1],
-                            one_round * v3[2] + verif_rounding * mp2[2])
-                        co07_r = (
-                            one_round * v3[0] + verif_rounding * mp3[0],
-                            one_round * v3[1] + verif_rounding * mp3[1],
-                            one_round * v3[2] + verif_rounding * mp3[2])
-                        
-                        co08_l = (
-                            one_round * v4[0] + verif_rounding * mp3[0],
-                            one_round * v4[1] + verif_rounding * mp3[1],
-                            one_round * v4[2] + verif_rounding * mp3[2])
-                        co09_r = (
-                            one_round * v4[0] + verif_rounding * mp4[0],
-                            one_round * v4[1] + verif_rounding * mp4[1],
-                            one_round * v4[2] + verif_rounding * mp4[2])
-                        
-                        co10_l = (
-                            one_round * v5[0] + verif_rounding * mp4[0],
-                            one_round * v5[1] + verif_rounding * mp4[1],
-                            one_round * v5[2] + verif_rounding * mp4[2])
-                        co11_r = (
-                            one_round * v5[0] + verif_rounding * mp5[0],
-                            one_round * v5[1] + verif_rounding * mp5[1],
-                            one_round * v5[2] + verif_rounding * mp5[2])
-
                         bz_pts.add(11)
-                        kn00_l = bz_pts[0]
-                        kn01_r = bz_pts[1]
-                        kn02_l = bz_pts[2]
-                        kn03_r = bz_pts[3]
-                        kn04_l = bz_pts[4]
-                        kn05_r = bz_pts[5]
-                        kn06_l = bz_pts[6]
-                        kn07_r = bz_pts[7]
-                        kn08_l = bz_pts[8]
-                        kn09_r = bz_pts[9]
-                        kn10_l = bz_pts[10]
-                        kn11_r = bz_pts[11]
 
-        # TODO: Look at Camzup for Bezier circle, see if commit
-        # history still has a copy of corner rounding method?
+                        kn_idx_curr = 0
+                        for kn in bz_pts:
+                            v_idx_curr = kn_idx_curr // 2
+                            v_idx_prev = (v_idx_curr - 1) % 6
+                            v_idx_next = (v_idx_curr + 1) % 6
+
+                            v_curr = v[v_idx_curr]
+                            v_prev = v[v_idx_prev]
+                            v_next = v[v_idx_next]
+
+                            mp_curr = mp[v_idx_curr]
+                            mp_prev = mp[v_idx_prev]
+                            mp_next = mp[v_idx_next]
+                            
+                            mp_trg = mp_curr
+                            handle_type_left = "FREE"
+                            handle_type_right = straight_edge
+
+                            is_even = kn_idx_curr % 2 != 1
+                            if is_even:
+                                mp_trg = mp_prev
+                                handle_type_left = straight_edge
+                                handle_type_right = "FREE"
+
+                            co_curr = (
+                                one_round * v_curr[0] + verif_rounding * mp_trg[0],
+                                one_round * v_curr[1] + verif_rounding * mp_trg[1],
+                                one_round * v_curr[2] + verif_rounding * mp_trg[2])
+                            
+                            kn.co = co_curr
+                            kn.handle_left_type = handle_type_left
+                            kn.handle_right_type = handle_type_right
+
+                            kn_idx_curr = kn_idx_curr + 1
 
         crv_obj = bpy.data.objects.new(crv_data.name, crv_data)
         crv_obj.location = context.scene.cursor.location
