@@ -113,8 +113,9 @@ class HexGridCurveMaker(bpy.types.Operator):
         eps = 0.000001
         o_3 = 1.0 / 3.0
         t_3 = 2.0 / 3.0
-        sqrt_3 = 1.7320508075688772 #  3.0 ** 0.5        
-        handle_fac = o_3 * sqrt_3
+        sqrt_3 = 1.7320508075688772 #  3.0 ** 0.5  
+        k = 0.5522847498307936 # 1.0 / (3.0 ** 0.5)
+        handle_fac = k * 1.1547005383792515
         one_h_fac = 1.0 - handle_fac
 
         # Unpack arguments.
