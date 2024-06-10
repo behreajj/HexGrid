@@ -34,7 +34,7 @@ class HexGridMeshMaker(bpy.types.Operator):
         min=1,
         soft_max=32,
         default=4,
-        step=1)
+        step=1) # type: ignore
 
     cell_radius: FloatProperty(
         name="Cell Radius",
@@ -43,7 +43,7 @@ class HexGridMeshMaker(bpy.types.Operator):
         soft_max=100.0,
         step=1,
         precision=3,
-        default=0.5)
+        default=0.5) # type: ignore
 
     cell_margin: FloatProperty(
         name="Cell Margin",
@@ -52,7 +52,7 @@ class HexGridMeshMaker(bpy.types.Operator):
         soft_max=99.0,
         step=1,
         precision=3,
-        default=0.0325)
+        default=0.0325) # type: ignore
 
     orientation: FloatProperty(
         name="Rotation",
@@ -61,12 +61,12 @@ class HexGridMeshMaker(bpy.types.Operator):
         soft_max=math.pi,
         default=0.0,
         subtype="ANGLE",
-        unit="ROTATION")
+        unit="ROTATION") # type: ignore
 
     merge_verts: BoolProperty(
         name="Merge Vertices",
         description="Merge overlapping hexagon cell vertices when margin is 0.0",
-        default=False)
+        default=False) # type: ignore
 
     face_type: EnumProperty(
         items=[
@@ -93,7 +93,7 @@ class HexGridMeshMaker(bpy.types.Operator):
 
         name="Face Type",
         default="NGON",
-        description="How to fill each hexagon cell")
+        description="How to fill each hexagon cell") # type: ignore
 
     extrude_lb: FloatProperty(
         name="Extrude Lower",
@@ -102,7 +102,7 @@ class HexGridMeshMaker(bpy.types.Operator):
         soft_max=1.0,
         step=1,
         precision=3,
-        default=0.0)
+        default=0.0) # type: ignore
 
     extrude_ub: FloatProperty(
         name="Extrude Upper",
@@ -111,7 +111,7 @@ class HexGridMeshMaker(bpy.types.Operator):
         soft_max=2.0,
         step=1,
         precision=3,
-        default=0.0)
+        default=0.0) # type: ignore
 
     terrain_type: EnumProperty(
         items=[
@@ -121,7 +121,7 @@ class HexGridMeshMaker(bpy.types.Operator):
             ("CONIC", "Conic", "Conic gradient", 4)],
         name="Terrain Type",
         default="UNIFORM",
-        description="How to extrude each hexagon cell")
+        description="How to extrude each hexagon cell") # type: ignore
 
     origin: FloatVectorProperty(
         name="Origin",
@@ -132,7 +132,7 @@ class HexGridMeshMaker(bpy.types.Operator):
         step=1,
         precision=3,
         size=2,
-        subtype="TRANSLATION")
+        subtype="TRANSLATION") # type: ignore
 
     destination: FloatVectorProperty(
         name="Destination",
@@ -143,7 +143,7 @@ class HexGridMeshMaker(bpy.types.Operator):
         step=1,
         precision=3,
         size=2,
-        subtype="TRANSLATION")
+        subtype="TRANSLATION") # type: ignore
 
     noise_influence: FloatProperty(
         name="Noise Influence",
@@ -153,7 +153,7 @@ class HexGridMeshMaker(bpy.types.Operator):
         precision=3,
         min=0.0,
         max=1.0,
-        subtype="FACTOR")
+        subtype="FACTOR") # type: ignore
 
     noise_scale: FloatProperty(
         name="Noise Scale",
@@ -162,7 +162,7 @@ class HexGridMeshMaker(bpy.types.Operator):
         soft_max=10.0,
         step=1,
         precision=3,
-        default=1.0)
+        default=1.0) # type: ignore
 
     noise_offset: FloatVectorProperty(
         name="Noise Offset",
@@ -170,7 +170,7 @@ class HexGridMeshMaker(bpy.types.Operator):
         default=(0.0, 0.0, 0.0),
         step=1,
         precision=3,
-        subtype="TRANSLATION")
+        subtype="TRANSLATION") # type: ignore
 
     noise_basis: EnumProperty(
         items=[
@@ -186,7 +186,7 @@ class HexGridMeshMaker(bpy.types.Operator):
             ("CELLNOISE", "Cell Noise", "Cell Noise", 10)],
         name="Noise Basis",
         default="BLENDER",
-        description="Underlying noise algorithm to use")
+        description="Underlying noise algorithm to use") # type: ignore
 
     def execute(self, context):
         bm = bmesh.new()
