@@ -133,7 +133,6 @@ class HexGridCurveMaker(bpy.types.Operator):
         pad_rad = max(eps, verif_rad - verif_margin)
         half_ext = extent * 0.5
         one_round = 1.0 - verif_rounding
-        # handle_mag = math.tan(math.tau / (4 * 6)) * (4 / 3) * pad_rad
 
         # Added to hexagon center to find corners.
         half_rad = pad_rad * 0.5
@@ -223,18 +222,24 @@ class HexGridCurveMaker(bpy.types.Operator):
 
                         kn_idx_curr = 0
                         for kn in bz_pts:
-                            kn.co = mp[kn_idx_curr]
+                            v_idx_next = (kn_idx_curr + 1) % 6                            
+                            v_prev = v[kn_idx_curr]
+                            v_next = v[v_idx_next]
+                            co = mp[kn_idx_curr]
+
+                            kn.co = co
                             kn.handle_left_type = "FREE"
                             kn.handle_right_type = "FREE"
-                            # TODO: Calculate tuples for handle_left and handle_right.
-                            # You might be able to lerp to the vertices by k * 1/3?
-                            kn.handle_left = (x, y, 0.0)
-                            kn.handle_right = (x, y, 0.0)
+                            kn.handle_left = (
+                                    one_h_fac * co[0] + handle_fac * v_prev[0],
+                                    one_h_fac * co[1] + handle_fac * v_prev[1],
+                                    one_h_fac * co[2] + handle_fac * v_prev[2])
+                            kn.handle_right = (
+                                    one_h_fac * co[0] + handle_fac * v_next[0],
+                                    one_h_fac * co[1] + handle_fac * v_next[1],
+                                    one_h_fac * co[2] + handle_fac * v_next[2])
                             kn_idx_curr = kn_idx_curr + 1
                     else:
-                        # https://github.com/behreajj/CamZup/blob/f0adca3a58aab7568bf60ccc15e67f35d326d72d/src/camzup/core/Curve2.java#L1041
-                        # https://github.com/behreajj/CamZup/blob/00696e7d3b28fa416ed5207029f870b6a6f656ef/src/camzup/core/Mesh2.java#L764
-
                         bz_pts.add(11)
 
                         kn_idx_curr = 0
