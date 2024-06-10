@@ -11,17 +11,17 @@ from bpy.props import (
 
 
 bl_info = {
-    "name": "Create Hex Grid",
+    "name": "Create Hex Grid Mesh",
     "author": "Jeremy Behreandt",
     "version": (0, 2),
     "blender": (4, 1, 0),
     "category": "Add Mesh",
-    "description": "Creates a hexagon grid.",
+    "description": "Creates a hexagon grid mesh.",
     "tracker_url": "https://github.com/behreajj/HexGrid"
 }
 
 
-class HexGridMaker(bpy.types.Operator):
+class HexGridMeshMaker(bpy.types.Operator):
     """Creates a grid of hexagons"""
 
     bl_idname = "mesh.primitive_hexgrid_add"
@@ -191,7 +191,7 @@ class HexGridMaker(bpy.types.Operator):
     def execute(self, context):
         bm = bmesh.new()
 
-        result = HexGridMaker.grid_hex(
+        result = HexGridMeshMaker.grid_hex(
             bm=bm,
             rings=self.rings,
             cell_radius=self.cell_radius,
@@ -201,7 +201,7 @@ class HexGridMaker(bpy.types.Operator):
             merge_verts=self.merge_verts)
 
         if self.face_type not in ["WIRE", "POINTS"]:
-            HexGridMaker.extrude_hexagons(
+            HexGridMeshMaker.extrude_hexagons(
                 bm=bm,
                 faces=result["faces"],
                 extrude_lb=self.extrude_lb,
@@ -319,15 +319,13 @@ class HexGridMaker(bpy.types.Operator):
         verts = []
         faces = []
 
-        # See https://www.redblobgames.com/grids/
-        #     hexagons/implementation.html#shape-hexagon
+        # See https://www.redblobgames.com/grids/hexagons/implementation.html#shape-hexagon
         for i in range(i_min, i_max + 1):
             j_min = max(i_min, i_min - i)
             j_max = min(i_max, i_max - i)
             i_ext = i * extent
 
             for j in range(j_min, j_max + 1):
-
                 # Hexagon center.
                 x = i_ext + j * half_ext
                 y = j * rad_1_5
@@ -693,14 +691,14 @@ def menu_func(self, context):
     # To find an icon String, go to Edit > Preferences > Add-ons,
     # then enable Icon Viewer. Then, in the Console Editor window,
     # click on the Icon Viewer button.
-    self.layout.operator(HexGridMaker.bl_idname, icon="SEQ_CHROMA_SCOPE")
+    self.layout.operator(HexGridMeshMaker.bl_idname, icon="SEQ_CHROMA_SCOPE")
 
 
 def register():
-    bpy.utils.register_class(HexGridMaker)
+    bpy.utils.register_class(HexGridMeshMaker)
     bpy.types.VIEW3D_MT_mesh_add.append(menu_func)
 
 
 def unregister():
-    bpy.utils.unregister_class(HexGridMaker)
+    bpy.utils.unregister_class(HexGridMeshMaker)
     bpy.types.VIEW3D_MT_mesh_add.remove(menu_func)
