@@ -66,8 +66,9 @@ class HexGridCurveMaker(bpy.types.Operator):
     
     straight_edge: EnumProperty(
         items=[
-            ("FREE", "Free", "Free", 1),
-            ("VECTOR", "Vector", "Vector", 2)],
+            ("ALIGNED", "Aligned", "Aligned", 1),
+            ("FREE", "Free", "Free", 2),
+            ("VECTOR", "Vector", "Vector", 3)],
         name="Handle Type",
         default="FREE",
         description="Handle type to use for straight edges") # type: ignore
@@ -113,7 +114,7 @@ class HexGridCurveMaker(bpy.types.Operator):
         eps = 0.000001
         o_3 = 1.0 / 3.0
         t_3 = 2.0 / 3.0
-        sqrt_3 = 1.7320508075688772 #  3.0 ** 0.5  
+        sqrt_3 = 1.7320508075688772 # 3.0 ** 0.5  
         k = 0.5522847498307936 # 1.0 / (3.0 ** 0.5)
         handle_fac = k * 1.1547005383792515
         one_h_fac = 1.0 - handle_fac
@@ -123,10 +124,16 @@ class HexGridCurveMaker(bpy.types.Operator):
         verif_rad = max(eps, self.cell_radius)
         verif_margin = max(0.0, self.cell_margin)
         verif_rounding = self.rounding
-        straight_edge = self.straight_edge
+        straight_handle_type = self.straight_edge
 
         is_straight = verif_rounding <= 0.0
         is_circle = verif_rounding >= 1.0
+        if is_straight and straight_handle_type == "ALIGNED":
+            straight_handle_type = "VECTOR"
+        
+        corner_handle_type = "FREE"
+        if straight_handle_type == "ALIGNED":
+            corner_handle_type = "ALIGNED"
 
         # Intermediate calculations.
         extent = sqrt_3 * verif_rad
@@ -194,8 +201,8 @@ class HexGridCurveMaker(bpy.types.Operator):
                         co_next = v[kn_idx_next]
 
                         kn.co = co_curr
-                        kn.handle_left_type = straight_edge
-                        kn.handle_right_type = straight_edge
+                        kn.handle_left_type = straight_handle_type
+                        kn.handle_right_type = straight_handle_type
                         kn.handle_left = (
                             t_3 * co_curr[0] + o_3 * co_prev[0],
                             t_3 * co_curr[1] + o_3 * co_prev[1],
@@ -229,8 +236,8 @@ class HexGridCurveMaker(bpy.types.Operator):
                             co = mp[kn_idx_curr]
 
                             kn.co = co
-                            kn.handle_left_type = "FREE"
-                            kn.handle_right_type = "FREE"
+                            kn.handle_left_type = corner_handle_type
+                            kn.handle_right_type = corner_handle_type
                             kn.handle_left = (
                                     one_h_fac * co[0] + handle_fac * v_prev[0],
                                     one_h_fac * co[1] + handle_fac * v_prev[1],
@@ -269,8 +276,8 @@ class HexGridCurveMaker(bpy.types.Operator):
                                     one_round * v_prev[2] + verif_rounding * mp_prev[2])
                                 
                                 kn.co = co_curr
-                                kn.handle_left_type = straight_edge
-                                kn.handle_right_type = "FREE"
+                                kn.handle_left_type = straight_handle_type
+                                kn.handle_right_type = corner_handle_type
                                 kn.handle_left = (
                                     t_3 * co_curr[0] + o_3 * co_prev[0],
                                     t_3 * co_curr[1] + o_3 * co_prev[1],
@@ -291,8 +298,8 @@ class HexGridCurveMaker(bpy.types.Operator):
                                     one_round * v_next[2] + verif_rounding * mp_curr[2])
 
                                 kn.co = co_curr
-                                kn.handle_left_type = "FREE"
-                                kn.handle_right_type = straight_edge
+                                kn.handle_left_type = corner_handle_type
+                                kn.handle_right_type = straight_handle_type
                                 kn.handle_left = (
                                     one_h_fac * co_curr[0] + handle_fac * v_curr[0],
                                     one_h_fac * co_curr[1] + handle_fac * v_curr[1],
