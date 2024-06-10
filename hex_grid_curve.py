@@ -54,6 +54,16 @@ class HexGridCurveMaker(bpy.types.Operator):
         precision=3,
         default=0.0325) # type: ignore
     
+    rounding: FloatProperty(
+        name="Rounding",
+        description="Percentage by which to round corners.",
+        default=0.0,
+        step=1,
+        precision=3,
+        min=0.0,
+        max=1.0,
+        subtype="FACTOR")  # type: ignore
+    
     straight_edge: EnumProperty(
         items=[
             ("FREE", "Free", "Free", 1),
@@ -101,22 +111,21 @@ class HexGridCurveMaker(bpy.types.Operator):
     def execute(self, context):
         # Constants.
         eps = 0.000001
-        k = 0.5522847498307936
         o_3 = 1.0 / 3.0
         t_3 = 2.0 / 3.0
-        sqrt_3 = 1.7320508075688772 #  3.0 ** 0.5
+        sqrt_3 = 1.7320508075688772 #  3.0 ** 0.5        
+        handle_fac = o_3 * sqrt_3
+        one_h_fac = 1.0 - handle_fac
 
         # Unpack arguments.
         verif_rings = 1 if self.rings < 1 else self.rings
         verif_rad = max(eps, self.cell_radius)
         verif_margin = max(0.0, self.cell_margin)
-        verif_rounding = 0.0
+        verif_rounding = self.rounding
         straight_edge = self.straight_edge
 
         is_straight = verif_rounding <= 0.0
         is_circle = verif_rounding >= 1.0
-        is_rounded = (not is_straight) \
-            and (not is_circle)
 
         # Intermediate calculations.
         extent = sqrt_3 * verif_rad
@@ -124,7 +133,7 @@ class HexGridCurveMaker(bpy.types.Operator):
         pad_rad = max(eps, verif_rad - verif_margin)
         half_ext = extent * 0.5
         one_round = 1.0 - verif_rounding
-        handle_mag = math.tan(math.tau / (4 * 6)) * (4 / 3) * pad_rad
+        # handle_mag = math.tan(math.tau / (4 * 6)) * (4 / 3) * pad_rad
 
         # Added to hexagon center to find corners.
         half_rad = pad_rad * 0.5
@@ -217,7 +226,10 @@ class HexGridCurveMaker(bpy.types.Operator):
                             kn.co = mp[kn_idx_curr]
                             kn.handle_left_type = "FREE"
                             kn.handle_right_type = "FREE"
-                            # TODO: Calculate tuples for handle_left and handle_right
+                            # TODO: Calculate tuples for handle_left and handle_right.
+                            # You might be able to lerp to the vertices by k * 1/3?
+                            kn.handle_left = (x, y, 0.0)
+                            kn.handle_right = (x, y, 0.0)
                             kn_idx_curr = kn_idx_curr + 1
                     else:
                         # https://github.com/behreajj/CamZup/blob/f0adca3a58aab7568bf60ccc15e67f35d326d72d/src/camzup/core/Curve2.java#L1041
@@ -237,26 +249,52 @@ class HexGridCurveMaker(bpy.types.Operator):
 
                             mp_curr = mp[v_idx_curr]
                             mp_prev = mp[v_idx_prev]
-                            mp_next = mp[v_idx_next]
                             
-                            mp_trg = mp_curr
-                            handle_type_left = "FREE"
-                            handle_type_right = straight_edge
-
                             is_even = kn_idx_curr % 2 != 1
                             if is_even:
-                                mp_trg = mp_prev
-                                handle_type_left = straight_edge
-                                handle_type_right = "FREE"
+                                co_curr = (
+                                    one_round * v_curr[0] + verif_rounding * mp_prev[0],
+                                    one_round * v_curr[1] + verif_rounding * mp_prev[1],
+                                    one_round * v_curr[2] + verif_rounding * mp_prev[2])
+                                
+                                co_prev = (
+                                    one_round * v_prev[0] + verif_rounding * mp_prev[0],
+                                    one_round * v_prev[1] + verif_rounding * mp_prev[1],
+                                    one_round * v_prev[2] + verif_rounding * mp_prev[2])
+                                
+                                kn.co = co_curr
+                                kn.handle_left_type = straight_edge
+                                kn.handle_right_type = "FREE"
+                                kn.handle_left = (
+                                    t_3 * co_curr[0] + o_3 * co_prev[0],
+                                    t_3 * co_curr[1] + o_3 * co_prev[1],
+                                    t_3 * co_curr[2] + o_3 * co_prev[2])
+                                kn.handle_right = (
+                                    one_h_fac * co_curr[0] + handle_fac * v_curr[0],
+                                    one_h_fac * co_curr[1] + handle_fac * v_curr[1],
+                                    one_h_fac * co_curr[2] + handle_fac * v_curr[2])
+                            else:
+                                co_curr = (
+                                    one_round * v_curr[0] + verif_rounding * mp_curr[0],
+                                    one_round * v_curr[1] + verif_rounding * mp_curr[1],
+                                    one_round * v_curr[2] + verif_rounding * mp_curr[2])
+                                
+                                co_next = (
+                                    one_round * v_next[0] + verif_rounding * mp_curr[0],
+                                    one_round * v_next[1] + verif_rounding * mp_curr[1],
+                                    one_round * v_next[2] + verif_rounding * mp_curr[2])
 
-                            co_curr = (
-                                one_round * v_curr[0] + verif_rounding * mp_trg[0],
-                                one_round * v_curr[1] + verif_rounding * mp_trg[1],
-                                one_round * v_curr[2] + verif_rounding * mp_trg[2])
-                            
-                            kn.co = co_curr
-                            kn.handle_left_type = handle_type_left
-                            kn.handle_right_type = handle_type_right
+                                kn.co = co_curr
+                                kn.handle_left_type = "FREE"
+                                kn.handle_right_type = straight_edge
+                                kn.handle_left = (
+                                    one_h_fac * co_curr[0] + handle_fac * v_curr[0],
+                                    one_h_fac * co_curr[1] + handle_fac * v_curr[1],
+                                    one_h_fac * co_curr[2] + handle_fac * v_curr[2])
+                                kn.handle_right = (
+                                    t_3 * co_curr[0] + o_3 * co_next[0],
+                                    t_3 * co_curr[1] + o_3 * co_next[1],
+                                    t_3 * co_curr[2] + o_3 * co_next[2])
 
                             kn_idx_curr = kn_idx_curr + 1
 
