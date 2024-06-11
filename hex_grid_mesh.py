@@ -73,20 +73,20 @@ class HexGridMeshMaker(bpy.types.Operator):
             ("NGON", "NGon", "Fill with a hexagon", 1),
             ("PENTA2", "Pentagon Split", "Split with 2 pentagons on a central axis", 2),
             ("PENTA3", "Pentagon Fan",
-             "Fill with 3 pentagons sharing a central vertex; creates 3 extra vertices", 3),
+            "Fill with 3 pentagons sharing a central vertex; creates 3 extra vertices", 3),
             ("QUAD2", "Quad Split", "Split with 2 quadrilaterlas on a central axis", 4),
             ("QUAD3", "Quad 3 Fan",
-             "Fill with 3 quadrilaterals sharing a central vertex", 5),
+            "Fill with 3 quadrilaterals sharing a central vertex", 5),
             ("QUAD_CR", "Quad Cross",
-             "Fill with 4 quadrilaterals sharing a central vertex; creates 2 extra vertices", 6),
+            "Fill with 4 quadrilaterals sharing a central vertex; creates 2 extra vertices", 6),
             ("QUAD6", "Quad 6 Fan",
-             "Fill with 6 quadrilaterals sharing a central vertex; creates 6 extra vertices", 7),
+            "Fill with 6 quadrilaterals sharing a central vertex; creates 6 extra vertices", 7),
             ("CATALAN_RAY", "Catalan Ray",
-             "Fills with triangles by connecting a corner to non-adjacent vertices", 8),
+            "Fills with triangles by connecting a corner to non-adjacent vertices", 8),
             ("CATALAN_TRI", "Catalan Tri",
-             "Fill with a central tri surrounded by 3 peripheral tris", 9),
+            "Fill with a central tri surrounded by 3 peripheral tris", 9),
             ("CATALAN_Z", "Catalan Z",
-             "Fill with 4 triangles, with edges forming a z pattern", 10),
+            "Fill with 4 triangles, with edges forming a z pattern", 10),
             ("TRI", "Tri Fan", "Fill with 6 triangles sharing a central vertex", 11),
             ("WIRE", "Wire", "Do not fill; use only edges", 12),
             ("POINTS", "Points", "Create only center points", 13)],
@@ -610,7 +610,7 @@ class HexGridMeshMaker(bpy.types.Operator):
 
             # For linear gradient.
             b = (dest[0] - origin[0],
-                 dest[1] - origin[1])
+                dest[1] - origin[1])
             dot_bb = b[0] ** 2 + b[1] ** 2
             inv_dot_bb = 0.0 if dot_bb == 0.0 else 1.0 / dot_bb
 
@@ -640,7 +640,7 @@ class HexGridMeshMaker(bpy.types.Operator):
 
                 # Find distance from origin to point.
                 a = (point[0] - origin[0],
-                     point[1] - origin[1])
+                    point[1] - origin[1])
 
                 if terrain_type == "LINEAR":
 

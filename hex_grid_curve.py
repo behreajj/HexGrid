@@ -1,7 +1,4 @@
 import bpy
-import bmesh
-import math
-import mathutils
 from bpy.props import (
     BoolProperty,
     IntProperty,
@@ -114,9 +111,8 @@ class HexGridCurveMaker(bpy.types.Operator):
         eps = 0.000001
         o_3 = 1.0 / 3.0
         t_3 = 2.0 / 3.0
-        sqrt_3 = 1.7320508075688772 # 3.0 ** 0.5  
-        k = 0.5522847498307936 # 1.0 / (3.0 ** 0.5)
-        handle_fac = k * 1.1547005383792515
+        sqrt_3 = 1.7320508075688772 # 3.0 ** 0.5
+        handle_fac = t_3
         one_h_fac = 1.0 - handle_fac
 
         # Unpack arguments.
@@ -260,8 +256,8 @@ class HexGridCurveMaker(bpy.types.Operator):
                             v_prev = v[v_idx_prev]
                             v_next = v[v_idx_next]
 
-                            mp_curr = mp[v_idx_curr]
                             mp_prev = mp[v_idx_prev]
+                            mp_next = mp[v_idx_curr]
                             
                             is_even = kn_idx_curr % 2 != 1
                             if is_even:
@@ -288,14 +284,14 @@ class HexGridCurveMaker(bpy.types.Operator):
                                     one_h_fac * co_curr[2] + handle_fac * v_curr[2])
                             else:
                                 co_curr = (
-                                    one_round * v_curr[0] + verif_rounding * mp_curr[0],
-                                    one_round * v_curr[1] + verif_rounding * mp_curr[1],
-                                    one_round * v_curr[2] + verif_rounding * mp_curr[2])
+                                    one_round * v_curr[0] + verif_rounding * mp_next[0],
+                                    one_round * v_curr[1] + verif_rounding * mp_next[1],
+                                    one_round * v_curr[2] + verif_rounding * mp_next[2])
                                 
                                 co_next = (
-                                    one_round * v_next[0] + verif_rounding * mp_curr[0],
-                                    one_round * v_next[1] + verif_rounding * mp_curr[1],
-                                    one_round * v_next[2] + verif_rounding * mp_curr[2])
+                                    one_round * v_next[0] + verif_rounding * mp_next[0],
+                                    one_round * v_next[1] + verif_rounding * mp_next[1],
+                                    one_round * v_next[2] + verif_rounding * mp_next[2])
 
                                 kn.co = co_curr
                                 kn.handle_left_type = corner_handle_type
