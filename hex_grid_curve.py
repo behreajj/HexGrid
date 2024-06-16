@@ -1,10 +1,8 @@
 import bpy
 from bpy.props import (
-    BoolProperty,
     IntProperty,
     EnumProperty,
-    FloatProperty,
-    FloatVectorProperty)
+    FloatProperty)
 
 
 bl_info = {
@@ -45,8 +43,8 @@ class HexGridCurveMaker(bpy.types.Operator):
     cell_margin: FloatProperty(
         name="Cell Margin",
         description="Margin between each hexagon cell",
-        min=0.0,
-        soft_max=99.0,
+        min=-100.0,
+        soft_max=100.0,
         step=1,
         precision=3,
         default=0.0325) # type: ignore
@@ -118,7 +116,9 @@ class HexGridCurveMaker(bpy.types.Operator):
         # Unpack arguments.
         verif_rings = 1 if self.rings < 1 else self.rings
         verif_rad = max(eps, self.cell_radius)
-        verif_margin = max(0.0, self.cell_margin)
+        # Allow negative cell margins so that the seed of life geometric
+        # pattern can be created.
+        verif_margin = self.cell_margin
         verif_rounding = self.rounding
         straight_handle_type = self.straight_edge
 
@@ -249,18 +249,14 @@ class HexGridCurveMaker(bpy.types.Operator):
                         kn_idx_curr = 0
                         for kn in bz_pts:
                             v_idx_curr = kn_idx_curr // 2
-                            v_idx_prev = (v_idx_curr - 1) % 6
-                            v_idx_next = (v_idx_curr + 1) % 6
-
                             v_curr = v[v_idx_curr]
-                            v_prev = v[v_idx_prev]
-                            v_next = v[v_idx_next]
-
-                            mp_prev = mp[v_idx_prev]
-                            mp_next = mp[v_idx_curr]
                             
                             is_even = kn_idx_curr % 2 != 1
                             if is_even:
+                                v_idx_prev = (v_idx_curr - 1) % 6
+                                v_prev = v[v_idx_prev]
+                                mp_prev = mp[v_idx_prev]
+
                                 co_curr = (
                                     one_round * v_curr[0] + verif_rounding * mp_prev[0],
                                     one_round * v_curr[1] + verif_rounding * mp_prev[1],
@@ -283,6 +279,10 @@ class HexGridCurveMaker(bpy.types.Operator):
                                     one_h_fac * co_curr[1] + handle_fac * v_curr[1],
                                     one_h_fac * co_curr[2] + handle_fac * v_curr[2])
                             else:
+                                v_idx_next = (v_idx_curr + 1) % 6
+                                mp_next = mp[v_idx_curr]
+                                v_next = v[v_idx_next]
+
                                 co_curr = (
                                     one_round * v_curr[0] + verif_rounding * mp_next[0],
                                     one_round * v_curr[1] + verif_rounding * mp_next[1],
