@@ -312,6 +312,9 @@ class HexGridCurveMaker(bpy.types.Operator):
         context.scene.collection.objects.link(crv_obj)
         return {"FINISHED"}
 
+    @classmethod
+    def poll(cls, context):
+        return context.area.type == "VIEW_3D"
 
 def menu_func(self, context):
     self.layout.operator(HexGridCurveMaker.bl_idname, icon="SEQ_CHROMA_SCOPE")
