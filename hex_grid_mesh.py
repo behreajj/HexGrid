@@ -1,8 +1,8 @@
-import bpy
-import bmesh
+import bpy # type: ignore
+import bmesh # type: ignore
 import math
-import mathutils
-from bpy.props import (
+import mathutils # type: ignore
+from bpy.props import ( # type: ignore
     BoolProperty,
     IntProperty,
     EnumProperty,
@@ -221,7 +221,7 @@ class HexGridMeshMaker(bpy.types.Operator):
 
         mesh_obj = bpy.data.objects.new(mesh_data.name, mesh_data)
         mesh_obj.location = context.scene.cursor.location
-        context.scene.collection.objects.link(mesh_obj)
+        context.collection.objects.link(mesh_obj)
 
         return {"FINISHED"}
 
